@@ -18,6 +18,10 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      build: {
+        // Hide the non-blocking warning about chunks > 500 kB.
+        chunkSizeWarningLimit: 1000,
+      },
     };
 });

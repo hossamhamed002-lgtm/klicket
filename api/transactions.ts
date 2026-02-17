@@ -1,4 +1,4 @@
-import { list, put } from '@vercel/blob';
+import { del, list, put } from '@vercel/blob';
 
 const BLOB_PATHNAME = 'klickit/transactions.json';
 
@@ -40,6 +40,13 @@ export default async function handler(req: any, res: any) {
       const body = parseBody(req.body);
       const transactions = Array.isArray(body?.transactions) ? body.transactions : [];
       const updatedAt = new Date().toISOString();
+
+      // In SDK versions without `allowOverwrite`, remove previous blob first.
+      const existing = await list({ prefix: BLOB_PATHNAME, limit: 20 });
+      const samePath = existing.blobs.filter((blob) => blob.pathname === BLOB_PATHNAME);
+      if (samePath.length > 0) {
+        await Promise.all(samePath.map((blob) => del(blob.url)));
+      }
 
       await put(
         BLOB_PATHNAME,

@@ -54,7 +54,6 @@ export default async function handler(req: any, res: any) {
         {
           access: 'public',
           addRandomSuffix: false,
-          allowOverwrite: true,
           contentType: 'application/json',
           cacheControlMaxAge: 0,
         }
@@ -71,4 +70,3 @@ export default async function handler(req: any, res: any) {
     });
   }
 }
-

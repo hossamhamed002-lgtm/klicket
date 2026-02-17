@@ -50,6 +50,8 @@ interface SearchFieldOption {
   getValue: (row: TransactionRow) => string;
 }
 
+type DetailsTabKey = 'payment' | 'operation' | 'customer';
+
 const STATUS_OPTIONS = ['ناجحة', 'منتظرة', 'غير ناجحة', 'مستردة', 'ملغية'] as const;
 type StatusOption = (typeof STATUS_OPTIONS)[number];
 
@@ -84,6 +86,7 @@ export const TransactionsPage: React.FC = () => {
   const [selectedSearchField, setSelectedSearchField] = useState<SearchFieldKey>('transactionId');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionRow | null>(null);
+  const [activeDetailsTab, setActiveDetailsTab] = useState<DetailsTabKey>('payment');
   
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -189,6 +192,28 @@ export const TransactionsPage: React.FC = () => {
     const parsed = parseInputDate(dateStr);
     return parsed ? formatDateForDisplay(parsed) : '--/--/----';
   };
+
+  const parseNumeric = (value: string): number => {
+    const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const formatMoney = (value: string, currency?: string): string => {
+    const amount = parseNumeric(value);
+    const resolvedCurrency = (currency || 'EGP').toUpperCase();
+    return `${resolvedCurrency} ${amount.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  const formatTimeForDisplay = (date: Date): string =>
+    date.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    });
 
   const normalizeSearchValue = (val: any): string =>
     String(val ?? '')
@@ -593,14 +618,14 @@ export const TransactionsPage: React.FC = () => {
         setFromDate('');
         setToDate('');
         const saveResult = await saveTransactionsToServer(dedupedData);
-        const blobHint =
-          saveResult.error?.includes('BLOB_READ_WRITE_TOKEN')
-            ? '\nتأكد من ربط Vercel Blob وإضافة المتغير BLOB_READ_WRITE_TOKEN في إعدادات المشروع ثم إعادة النشر.'
+        const supabaseHint =
+          saveResult.error && (/SUPABASE_/i.test(saveResult.error) || /supabase/i.test(saveResult.error))
+            ? '\nتأكد من إضافة SUPABASE_URL و SUPABASE_SERVICE_ROLE_KEY في إعدادات Vercel ثم أعد النشر.'
             : '';
         alert(
           saveResult.ok
             ? `تم تحميل ${dedupedData.length} عملية وحفظها بنجاح`
-            : `تم تحميل البيانات، لكن حدث خطأ أثناء الحفظ على الخادم: ${saveResult.error}${blobHint}`
+            : `تم تحميل البيانات، لكن حدث خطأ أثناء الحفظ على الخادم: ${saveResult.error}${supabaseHint}`
         );
       }
       
@@ -972,7 +997,10 @@ export const TransactionsPage: React.FC = () => {
                     <tr
                       key={`${row.id}-${index}`}
                       className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => setSelectedTransaction(row)}
+                      onClick={() => {
+                        setSelectedTransaction(row);
+                        setActiveDetailsTab('payment');
+                      }}
                     >
                         <td className="py-4 px-4">{row.customer}</td>
                         <td className="py-4 px-4 font-mono">{row.id}</td>
@@ -991,128 +1019,289 @@ export const TransactionsPage: React.FC = () => {
         </table>
       </div>
 
-      {selectedTransaction && (
-        <div
-          className="fixed inset-0 z-50 bg-black/20 p-3 md:p-6"
-          onClick={() => setSelectedTransaction(null)}
-        >
-          <div
-            className="h-full w-full bg-[#f3f3f5] rounded-xl border border-gray-200 shadow-2xl overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 md:px-8 py-5 border-b border-gray-200">
-              <button
-                type="button"
-                onClick={() => setSelectedTransaction(null)}
-                className="text-gray-500 hover:text-gray-700 transition-colors"
-                aria-label="إغلاق"
-              >
-                <X className="w-10 h-10" />
-              </button>
-              <h3 className="text-xl md:text-3xl font-semibold text-gray-700">
-                المعاملة {selectedTransaction.id}
-              </h3>
-            </div>
+      {selectedTransaction &&
+        (() => {
+          const transactionDateObj =
+            selectedTransaction.dateValue ?? parseTransactionDate(selectedTransaction.date);
+          const transactionDateLabel = transactionDateObj
+            ? formatDateForDisplay(transactionDateObj)
+            : selectedTransaction.date || '-';
+          const transactionTimeLabel = transactionDateObj
+            ? formatTimeForDisplay(transactionDateObj)
+            : '-';
+          const serviceTax = Math.max(
+            0,
+            parseNumeric(selectedTransaction.total) - parseNumeric(selectedTransaction.totalNoTax)
+          );
+          const tabs: { key: DetailsTabKey; label: string }[] = [
+            { key: 'payment', label: 'تفاصيل الدفع' },
+            { key: 'operation', label: 'تفاصيل العملية' },
+            { key: 'customer', label: 'تفاصيل العميل' },
+          ];
 
-            <div className="p-3 md:p-6 flex-1 overflow-auto" dir="rtl">
-              <div className="bg-white rounded-xl border border-gray-200 min-h-full">
-                <div className="px-6 pt-5">
-                  <div className="flex items-center justify-end gap-8 text-xl md:text-2xl font-semibold text-gray-600">
-                    <span className="text-brand-purple border-b-4 border-brand-purple pb-3">تفاصيل الدفع</span>
-                    <span>تفاصيل العملية</span>
-                    <span>تفاصيل العميل</span>
-                  </div>
+          return (
+            <div
+              className="fixed inset-0 z-50 bg-black/20 p-3 md:p-6"
+              onClick={() => setSelectedTransaction(null)}
+            >
+              <div
+                className="h-full w-full bg-[#f3f3f5] rounded-xl border border-gray-200 shadow-2xl overflow-hidden flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between px-5 md:px-8 py-5 border-b border-gray-200">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTransaction(null)}
+                    className="text-gray-500 hover:text-gray-700 transition-colors"
+                    aria-label="إغلاق"
+                  >
+                    <X className="w-10 h-10" />
+                  </button>
+                  <h3 className="text-xl md:text-3xl font-semibold text-gray-700">
+                    المعاملة {selectedTransaction.id}
+                  </h3>
                 </div>
 
-                <div className="mx-6 mt-1 border-t border-gray-200"></div>
-
-                <div className="px-6 md:px-10 py-6 md:py-10">
-                  <h4 className="text-brand-purple text-2xl md:text-4xl font-bold underline mb-8">
-                    {selectedTransaction.itemName || `المدفوعة رقم_${selectedTransaction.id}`}
-                  </h4>
-
-                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 text-gray-700">
-                    <div className="xl:border-l border-gray-200 xl:pl-10 space-y-5 text-lg md:text-2xl">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">اسم المدفوع</span>
-                        <span className="font-semibold">{selectedTransaction.itemName || '-'}</span>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">السنة الأكاديمية</span>
-                        <span className="font-semibold">{selectedTransaction.academicYear || '-'}</span>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">المبلغ</span>
-                        <span className="font-semibold" dir="ltr">
-                          {(selectedTransaction.currency || 'EGP') + ' ' + (selectedTransaction.itemAmount || selectedTransaction.total)}
-                        </span>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">الكمية</span>
-                        <span className="font-semibold">{selectedTransaction.quantity || '1'}</span>
+                <div className="p-3 md:p-6 flex-1 overflow-auto" dir="rtl">
+                  <div className="bg-white rounded-xl border border-gray-200 min-h-full">
+                    <div className="px-6 pt-5">
+                      <div className="flex items-center justify-end gap-8 text-xl md:text-2xl font-semibold text-gray-600">
+                        {tabs.map((tab) => (
+                          <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => setActiveDetailsTab(tab.key)}
+                            className={`pb-3 border-b-4 transition-colors ${
+                              activeDetailsTab === tab.key
+                                ? 'text-brand-purple border-brand-purple'
+                                : 'text-gray-600 border-transparent hover:text-gray-700'
+                            }`}
+                          >
+                            {tab.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
 
-                    <div className="xl:border-l border-gray-200 xl:pl-10 space-y-5 text-lg md:text-2xl">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">Student Name</span>
-                        <span className="font-semibold">{selectedTransaction.studentName || '-'}</span>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">Student ID</span>
-                        <span className="font-semibold">{selectedTransaction.studentId || '-'}</span>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">Parent Name</span>
-                        <span className="font-semibold">{selectedTransaction.parentName || '-'}</span>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">Parent ID</span>
-                        <span className="font-semibold">{selectedTransaction.parentCode || '-'}</span>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">Grade Name</span>
-                        <span className="font-semibold">{selectedTransaction.gradeName || '-'}</span>
-                      </div>
-                    </div>
+                    <div className="mx-6 mt-1 border-t border-gray-200"></div>
 
-                    <div className="space-y-5 text-lg md:text-2xl">
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">رقم العملية</span>
-                        <span className="font-semibold">{selectedTransaction.id}</span>
+                    {activeDetailsTab === 'payment' && (
+                      <div className="px-6 md:px-10 py-6 md:py-10">
+                        <h4 className="text-brand-purple text-2xl md:text-4xl font-bold underline mb-8">
+                          {selectedTransaction.itemName || `المدفوعة رقم_${selectedTransaction.id}`}
+                        </h4>
+
+                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 text-gray-700">
+                          <div className="xl:border-l border-gray-200 xl:pl-10 space-y-5 text-lg md:text-2xl">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">اسم المدفوع</span>
+                              <span className="font-semibold">{selectedTransaction.itemName || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">السنة الأكاديمية</span>
+                              <span className="font-semibold">{selectedTransaction.academicYear || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">المبلغ</span>
+                              <span className="font-semibold" dir="ltr">
+                                {formatMoney(
+                                  selectedTransaction.itemAmount || selectedTransaction.total,
+                                  selectedTransaction.currency
+                                )}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">الكمية</span>
+                              <span className="font-semibold">{selectedTransaction.quantity || '1'}</span>
+                            </div>
+                          </div>
+
+                          <div className="xl:border-l border-gray-200 xl:pl-10 space-y-5 text-lg md:text-2xl">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">Student Name</span>
+                              <span className="font-semibold">{selectedTransaction.studentName || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">Student ID</span>
+                              <span className="font-semibold">{selectedTransaction.studentId || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">Parent Name</span>
+                              <span className="font-semibold">{selectedTransaction.parentName || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">Parent ID</span>
+                              <span className="font-semibold">{selectedTransaction.parentCode || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">Grade Name</span>
+                              <span className="font-semibold">{selectedTransaction.gradeName || '-'}</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-5 text-lg md:text-2xl">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">رقم العملية</span>
+                              <span className="font-semibold">{selectedTransaction.id}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">التاريخ</span>
+                              <span className="font-semibold">{transactionDateLabel}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">الحالة</span>
+                              <span className="font-semibold">{selectedTransaction.status || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">طريقة الدفع</span>
+                              <span className="font-semibold">{selectedTransaction.method || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">Provider</span>
+                              <span className="font-semibold">{selectedTransaction.provider || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">Bank Ref</span>
+                              <span className="font-semibold">{selectedTransaction.bankReferenceNumber || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">Merchant Order</span>
+                              <span className="font-semibold">{selectedTransaction.merchantOrderId || '-'}</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">التاريخ</span>
-                        <span className="font-semibold">{selectedTransaction.date || '-'}</span>
+                    )}
+
+                    {activeDetailsTab === 'operation' && (
+                      <div className="px-6 md:px-10 py-6 md:py-10">
+                        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 text-gray-700 text-lg md:text-2xl">
+                          <div className="space-y-5 xl:border-l border-gray-200 xl:pl-10">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">المبلغ</span>
+                              <span className="font-semibold" dir="ltr">
+                                {formatMoney(selectedTransaction.total, selectedTransaction.currency)}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">ضريبة الخدمة المضافة</span>
+                              <span className="font-semibold" dir="ltr">
+                                {formatMoney(serviceTax.toFixed(2), selectedTransaction.currency)}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">Order Date</span>
+                              <span className="font-semibold" dir="ltr">{transactionDateLabel}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">تاريخ الإصدار</span>
+                              <span className="font-semibold" dir="ltr">{transactionDateLabel}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">وقت الإصدار</span>
+                              <span className="font-semibold" dir="ltr">{transactionTimeLabel}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">طريقة الدفع</span>
+                              <span className="font-semibold">{selectedTransaction.method || '-'}</span>
+                            </div>
+                          </div>
+
+                          <div className="xl:col-span-2 space-y-5">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">الرقم المرجعي للبنك</span>
+                              <span className="font-semibold" dir="ltr">
+                                {selectedTransaction.bankReferenceNumber || '-'}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">رقم العملية</span>
+                              <span className="font-semibold" dir="ltr">{selectedTransaction.id}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">رقم العملية من قبل المؤسسة</span>
+                              <span className="font-semibold" dir="ltr">
+                                {selectedTransaction.merchantOrderId || '-'}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">مزود الخدمة</span>
+                              <span className="font-semibold">{selectedTransaction.provider || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">الحالة</span>
+                              <span className="font-semibold">{selectedTransaction.status || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">الفرع</span>
+                              <span className="font-semibold">{selectedTransaction.branch || '-'}</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">الحالة</span>
-                        <span className="font-semibold">{selectedTransaction.status || '-'}</span>
+                    )}
+
+                    {activeDetailsTab === 'customer' && (
+                      <div className="px-6 md:px-10 py-6 md:py-10">
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 text-gray-700 text-lg md:text-2xl">
+                          <div className="space-y-5 xl:border-l border-gray-200 xl:pl-10">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">اسم العميل</span>
+                              <span className="font-semibold">{selectedTransaction.customer || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">رقم الهاتف</span>
+                              <span className="font-semibold" dir="ltr">
+                                {selectedTransaction.customerPhone || '-'}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">البريد الإلكتروني</span>
+                              <span className="font-semibold" dir="ltr">
+                                {selectedTransaction.customerEmail || '-'}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">اسم ولي الأمر</span>
+                              <span className="font-semibold">{selectedTransaction.parentName || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">كود ولي الأمر</span>
+                              <span className="font-semibold" dir="ltr">
+                                {selectedTransaction.parentCode || '-'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-5">
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">اسم الطالب</span>
+                              <span className="font-semibold">{selectedTransaction.studentName || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">كود الطالب</span>
+                              <span className="font-semibold" dir="ltr">
+                                {selectedTransaction.studentId || '-'}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">المرحلة</span>
+                              <span className="font-semibold">{selectedTransaction.gradeName || '-'}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3">
+                              <span className="text-gray-500">السنة الأكاديمية</span>
+                              <span className="font-semibold">{selectedTransaction.academicYear || '-'}</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">طريقة الدفع</span>
-                        <span className="font-semibold">{selectedTransaction.method || '-'}</span>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">Provider</span>
-                        <span className="font-semibold">{selectedTransaction.provider || '-'}</span>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">Bank Ref</span>
-                        <span className="font-semibold">{selectedTransaction.bankReferenceNumber || '-'}</span>
-                      </div>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="text-gray-500">Merchant Order</span>
-                        <span className="font-semibold">{selectedTransaction.merchantOrderId || '-'}</span>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          );
+        })()}
       
       {/* Pagination */}
       <Pagination totalPages={Math.ceil(displayedTransactions.length / 5) || 1} />

@@ -1,7 +1,11 @@
 import React from 'react';
 import { Bell, Search, Globe, ChevronDown, SlidersHorizontal, Calendar } from 'lucide-react';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  onMenuToggle?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ onMenuToggle }) => {
   return (
     <header className="bg-white/80 backdrop-blur-sm sticky top-0 z-10 p-4 mb-6 shadow-sm border-b border-gray-100">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -27,11 +31,16 @@ export const Header: React.FC = () => {
           </div>
           
            {/* Mobile Menu Trigger (Hidden on Desktop) */}
-           <div className="lg:hidden p-2 rounded-md bg-gray-100">
+           <button
+             type="button"
+             onClick={onMenuToggle}
+             className="lg:hidden p-2 rounded-md bg-gray-100 hover:bg-gray-200 transition-colors"
+             aria-label="فتح القائمة الجانبية"
+           >
              <div className="w-5 h-0.5 bg-gray-600 mb-1"></div>
              <div className="w-5 h-0.5 bg-gray-600 mb-1"></div>
              <div className="w-5 h-0.5 bg-gray-600"></div>
-           </div>
+           </button>
         </div>
 
         {/* Right Side: Greeting & Filters (RTL: Visually on the right) */}

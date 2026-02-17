@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Home, History, School, ChevronDown, ChevronUp, List, Settings, ChevronsRight } from 'lucide-react';
 
 interface SidebarProps {
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: 'dashboard' | 'transactions' | 'school-control') => void;
   currentPage?: string;
   isOpen?: boolean;
   onToggle?: () => void;
@@ -11,7 +11,7 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentPage = 'transactions', isOpen = true, onToggle }) => {
   const [expandedMenu, setExpandedMenu] = useState<string | null>('transactions');
 
-  const handleNavigate = (page: string) => {
+  const handleNavigate = (page: 'dashboard' | 'transactions' | 'school-control') => {
     if (onNavigate) onNavigate(page);
   };
 
@@ -24,7 +24,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentPage = 'tra
   };
 
   return (
-    <aside className={`w-64 bg-white h-screen fixed right-0 top-0 border-l border-gray-100 flex flex-col z-20 hidden lg:flex font-cairo shadow-[0_3px_10px_rgb(0,0,0,0.05)] transition-transform duration-300 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+    <aside
+      className={`w-64 bg-white h-screen fixed right-0 top-0 border-l border-gray-100 flex flex-col z-50 font-cairo shadow-[0_3px_10px_rgb(0,0,0,0.05)] transition-transform duration-300 ${
+        isOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}
+    >
       {/* Logo Area */}
       <div className="h-28 flex items-center justify-center mb-2">
         <h1 className="text-[62px] leading-none tracking-[-0.06em] font-semibold select-none">

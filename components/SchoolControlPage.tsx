@@ -5,6 +5,7 @@ import {
   Upload,
   Download,
   Edit,
+  Trash2,
   X,
   ChevronDown,
   ArrowDownUp,
@@ -50,6 +51,13 @@ interface ParentChildSummary {
   studentCode: string;
   grade: string;
   paidAmount: number;
+}
+
+interface ClassSummaryRow {
+  key: string;
+  className: string;
+  displayName: string;
+  studentsCount: number;
 }
 
 interface ParentEditForm {
@@ -218,10 +226,13 @@ export const SchoolControlPage: React.FC = () => {
   const [selectedParent, setSelectedParent] = useState<ParentRow | null>(null);
   const [parentSearch, setParentSearch] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
+  const [classSearch, setClassSearch] = useState('');
   const [parentsPage, setParentsPage] = useState(1);
   const [parentsPageSize, setParentsPageSize] = useState(5);
   const [studentsPage, setStudentsPage] = useState(1);
   const [studentsPageSize, setStudentsPageSize] = useState(5);
+  const [classesPage, setClassesPage] = useState(1);
+  const [classesPageSize, setClassesPageSize] = useState(5);
   const [isParentEditOpen, setIsParentEditOpen] = useState(false);
   const [isParentAddOpen, setIsParentAddOpen] = useState(false);
   const [isStudentAddOpen, setIsStudentAddOpen] = useState(false);
@@ -311,6 +322,10 @@ export const SchoolControlPage: React.FC = () => {
   useEffect(() => {
     setStudentsPage(1);
   }, [studentSearch]);
+
+  useEffect(() => {
+    setClassesPage(1);
+  }, [classSearch]);
 
   useEffect(() => {
     if (!isAnyDrawerOpen) return;
@@ -692,6 +707,32 @@ export const SchoolControlPage: React.FC = () => {
     }
   };
 
+  const handleClassViewStudents = (className: string) => {
+    setActiveTab('students');
+    setStudentSearch(className === 'غير محدد' ? '' : className);
+    setStudentsPage(1);
+  };
+
+  const handleDeleteClass = async (classRow: ClassSummaryRow) => {
+    const confirmed = window.confirm(`هل تريد حذف جميع الطلاب في صف "${classRow.className}"؟`);
+    if (!confirmed) return;
+
+    const nextStudents = dedupeStudents(
+      studentsDataRef.current.filter((student) => {
+        const grade = String(student.grade || '').trim() || 'غير محدد';
+        return normalizeKey(grade) !== classRow.key;
+      })
+    );
+
+    setStudentsData(nextStudents);
+    studentsDataRef.current = nextStudents;
+
+    const saveResult = await saveSchoolControlToServer(parentsDataRef.current, nextStudents);
+    if (!saveResult.ok) {
+      alert(`تم حذف الصف محليًا، لكن فشل الحفظ على الخادم: ${saveResult.error}`);
+    }
+  };
+
   const handleParentUploadClick = () => {
     if (parentFileInputRef.current) {
       parentFileInputRef.current.click();
@@ -856,8 +897,48 @@ export const SchoolControlPage: React.FC = () => {
     ).sort((a, b) => a.localeCompare(b, 'ar'));
   }, [studentsData]);
 
+  const classesData = useMemo(() => {
+    const byClass = new Map<string, ClassSummaryRow>();
+
+    studentsData.forEach((student) => {
+      const rawGrade = String(student.grade || '').trim();
+      const className = rawGrade || 'غير محدد';
+      const key = normalizeKey(className) || 'undefined-class';
+
+      const existing = byClass.get(key);
+      if (existing) {
+        existing.studentsCount += 1;
+        return;
+      }
+
+      byClass.set(key, {
+        key,
+        className,
+        displayName: className,
+        studentsCount: 1,
+      });
+    });
+
+    return Array.from(byClass.values()).sort((a, b) => {
+      if (b.studentsCount !== a.studentsCount) return b.studentsCount - a.studentsCount;
+      return a.className.localeCompare(b.className, 'ar');
+    });
+  }, [studentsData]);
+
+  const filteredClassesData = useMemo(() => {
+    const query = normalizeKey(classSearch);
+    if (!query) return classesData;
+
+    return classesData.filter((row) =>
+      [row.className, row.displayName, String(row.studentsCount)]
+        .map((value) => normalizeKey(value))
+        .some((value) => value.includes(query))
+    );
+  }, [classSearch, classesData]);
+
   const parentsTotalPages = Math.max(1, Math.ceil(filteredParentsData.length / parentsPageSize));
   const studentsTotalPages = Math.max(1, Math.ceil(filteredStudentsData.length / studentsPageSize));
+  const classesTotalPages = Math.max(1, Math.ceil(filteredClassesData.length / classesPageSize));
 
   useEffect(() => {
     setParentsPage((current) => Math.min(Math.max(1, current), parentsTotalPages));
@@ -866,6 +947,10 @@ export const SchoolControlPage: React.FC = () => {
   useEffect(() => {
     setStudentsPage((current) => Math.min(Math.max(1, current), studentsTotalPages));
   }, [studentsTotalPages]);
+
+  useEffect(() => {
+    setClassesPage((current) => Math.min(Math.max(1, current), classesTotalPages));
+  }, [classesTotalPages]);
 
   const paginatedParentsData = useMemo(() => {
     const startIndex = (parentsPage - 1) * parentsPageSize;
@@ -876,6 +961,11 @@ export const SchoolControlPage: React.FC = () => {
     const startIndex = (studentsPage - 1) * studentsPageSize;
     return filteredStudentsData.slice(startIndex, startIndex + studentsPageSize);
   }, [filteredStudentsData, studentsPage, studentsPageSize]);
+
+  const paginatedClassesData = useMemo(() => {
+    const startIndex = (classesPage - 1) * classesPageSize;
+    return filteredClassesData.slice(startIndex, startIndex + classesPageSize);
+  }, [filteredClassesData, classesPage, classesPageSize]);
 
   const selectedParentCodes = useMemo(() => {
     if (!selectedParent) return [];
@@ -969,7 +1059,9 @@ export const SchoolControlPage: React.FC = () => {
           onClick={() => setActiveTab('classes')}
         >
           <span className="font-bold">الصفوف</span>
-          <span className="bg-purple-100 text-brand-purple text-xs px-2 py-0.5 rounded-full font-bold">0</span>
+          <span className="bg-purple-100 text-brand-purple text-xs px-2 py-0.5 rounded-full font-bold">
+            {classesData.length}
+          </span>
         </div>
 
         <div
@@ -992,6 +1084,86 @@ export const SchoolControlPage: React.FC = () => {
           <span className="bg-brand-purple text-white text-xs px-2 py-0.5 rounded-full font-bold">{parentsData.length}</span>
         </div>
       </div>
+
+      {activeTab === 'classes' && (
+        <>
+          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+            <div className="w-full xl:w-auto flex justify-end">
+              <div className="relative flex items-center w-full md:w-80 bg-gray-50 rounded-full border border-gray-200 hover:bg-white transition-colors">
+                <input
+                  type="text"
+                  value={classSearch}
+                  onChange={(e) => setClassSearch(e.target.value)}
+                  placeholder="بحث"
+                  className="w-full py-2 px-4 bg-transparent outline-none text-right placeholder-gray-400"
+                />
+                <Search className="w-5 h-5 text-gray-400 absolute left-4" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto mt-6">
+            <table className="w-full min-w-[950px] border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-100 text-gray-600 text-sm font-bold">
+                  <th className="py-4 px-4 text-right">
+                    <div className="flex items-center gap-1 cursor-pointer">
+                      اسم الصف
+                      <ArrowDownUp className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-4 px-4 text-right">اسم العرض</th>
+                  <th className="py-4 px-4 text-right">
+                    <div className="flex items-center gap-1 cursor-pointer">
+                      عدد الطلاب
+                      <ArrowDownUp className="w-3 h-3 text-gray-400" />
+                    </div>
+                  </th>
+                  <th className="py-4 px-4 text-right">تحديث البيانات</th>
+                  <th className="py-4 px-4 text-right">Delete</th>
+                </tr>
+              </thead>
+              <tbody className="text-gray-700 text-sm">
+                {filteredClassesData.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-gray-400">
+                      لا توجد صفوف متاحة من بيانات الطلاب
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedClassesData.map((row) => (
+                    <tr key={row.key} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                      <td className="py-4 px-4 font-semibold">{row.className}</td>
+                      <td className="py-4 px-4 text-gray-500">{row.displayName}</td>
+                      <td className="py-4 px-4 text-gray-700 font-semibold">{row.studentsCount}</td>
+                      <td className="py-4 px-4">
+                        <button
+                          type="button"
+                          onClick={() => handleClassViewStudents(row.className)}
+                          className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
+                          title="عرض طلاب الصف"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                      </td>
+                      <td className="py-4 px-4">
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteClass(row)}
+                          className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
+                          title="حذف جميع طلاب الصف"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {activeTab === 'parents' && !selectedParent && (
         <>
@@ -1687,6 +1859,19 @@ export const SchoolControlPage: React.FC = () => {
           onPageSizeChange={(size) => {
             setParentsPageSize(size);
             setParentsPage(1);
+          }}
+        />
+      )}
+
+      {activeTab === 'classes' && (
+        <Pagination
+          totalItems={filteredClassesData.length}
+          currentPage={classesPage}
+          pageSize={classesPageSize}
+          onPageChange={setClassesPage}
+          onPageSizeChange={(size) => {
+            setClassesPageSize(size);
+            setClassesPage(1);
           }}
         />
       )}

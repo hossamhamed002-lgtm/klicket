@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, ChevronDown, Calendar, Download, SlidersHorizontal, ArrowDownUp, Upload, X, Check } from 'lucide-react';
 import { read, utils, writeFile } from 'xlsx';
 import { Pagination } from './Pagination';
+import { FloatingQuickActions } from './FloatingQuickActions';
 
 interface TransactionRow {
   id: string;
@@ -87,6 +88,8 @@ export const TransactionsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionRow | null>(null);
   const [activeDetailsTab, setActiveDetailsTab] = useState<DetailsTabKey>('payment');
+  const [transactionsPage, setTransactionsPage] = useState(1);
+  const [transactionsPageSize, setTransactionsPageSize] = useState(5);
   
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -435,6 +438,10 @@ export const TransactionsPage: React.FC = () => {
     };
   }, [selectedTransaction]);
 
+  useEffect(() => {
+    setTransactionsPage(1);
+  }, [searchQuery, selectedSearchField, fromDate, toDate, selectedStatuses]);
+
   const filteredTransactions = useMemo(() => {
     const parsedFrom = parseInputDate(fromDate);
     const parsedTo = parseInputDate(toDate);
@@ -475,6 +482,17 @@ export const TransactionsPage: React.FC = () => {
       normalizeSearchValue(selectedOption.getValue(row)).includes(normalizedQuery)
     );
   }, [statusFilteredTransactions, searchQuery, selectedSearchField]);
+
+  const transactionsTotalPages = Math.max(1, Math.ceil(displayedTransactions.length / transactionsPageSize));
+
+  useEffect(() => {
+    setTransactionsPage((current) => Math.min(Math.max(1, current), transactionsTotalPages));
+  }, [transactionsTotalPages]);
+
+  const paginatedTransactions = useMemo(() => {
+    const startIndex = (transactionsPage - 1) * transactionsPageSize;
+    return displayedTransactions.slice(startIndex, startIndex + transactionsPageSize);
+  }, [displayedTransactions, transactionsPage, transactionsPageSize]);
 
   // --- Handle File Upload ---
   const handleUploadClick = () => {
@@ -617,6 +635,7 @@ export const TransactionsPage: React.FC = () => {
         setSearchQuery('');
         setFromDate('');
         setToDate('');
+        setTransactionsPage(1);
         const saveResult = await saveTransactionsToServer(dedupedData);
         const supabaseHint =
           saveResult.error && (/SUPABASE_/i.test(saveResult.error) || /supabase/i.test(saveResult.error))
@@ -993,9 +1012,9 @@ export const TransactionsPage: React.FC = () => {
                                 </td>
                             </tr>
                         ) : (
-                displayedTransactions.map((row, index) => (
+                paginatedTransactions.map((row, index) => (
                     <tr
-                      key={`${row.id}-${index}`}
+                      key={`${row.id}-${(transactionsPage - 1) * transactionsPageSize + index}`}
                       className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
                       onClick={() => {
                         setSelectedTransaction(row);
@@ -1304,7 +1323,18 @@ export const TransactionsPage: React.FC = () => {
         })()}
       
       {/* Pagination */}
-      <Pagination totalPages={Math.ceil(displayedTransactions.length / 5) || 1} />
+      <Pagination
+        totalItems={displayedTransactions.length}
+        currentPage={transactionsPage}
+        pageSize={transactionsPageSize}
+        onPageChange={setTransactionsPage}
+        onPageSizeChange={(size) => {
+          setTransactionsPageSize(size);
+          setTransactionsPage(1);
+        }}
+      />
+
+      <FloatingQuickActions />
 
     </div>
   );

@@ -19,9 +19,11 @@ View your app in AI Studio: https://ai.studio/apps/drive/1KQDSfLD4o50Oljio5Hd2_2
 3. Run the app:
    `npm run dev`
 
-## Supabase Setup (Transactions Persistence)
+## Supabase Setup (Persistence)
 
-The app saves and loads uploaded transactions through `api/transactions.ts`.
+The app saves and loads uploaded data through:
+- `api/transactions.ts` (transactions page)
+- `api/school-control.ts` (parents + students in school control page)
 To make data persistent for all users/devices, connect Supabase:
 
 1. In Supabase, open SQL Editor and run:
@@ -30,6 +32,7 @@ To make data persistent for all users/devices, connect Supabase:
    `SUPABASE_URL` = your project URL (example: `https://xxxx.supabase.co`)
    `SUPABASE_SERVICE_ROLE_KEY` = your Supabase service role key
    `SUPABASE_TRANSACTIONS_TABLE` = `transactions_snapshots` (optional, default already set)
+   `SUPABASE_SCHOOL_TABLE` = `school_control_snapshots` (optional, default already set)
 3. Redeploy the project on Vercel.
 
-After that, any Excel upload from the app will be stored in Supabase and shown to all users.
+After that, any Excel upload from transactions/parents/students pages will be stored in Supabase and shown to all users.

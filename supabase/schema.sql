@@ -14,3 +14,16 @@ create index if not exists idx_transactions_snapshots_updated_at
 
 -- API route uses service-role key, so RLS is optional here.
 alter table public.transactions_snapshots disable row level security;
+
+create table if not exists public.school_control_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  parents jsonb not null default '[]'::jsonb,
+  students jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_school_control_snapshots_updated_at
+  on public.school_control_snapshots (updated_at desc);
+
+alter table public.school_control_snapshots disable row level security;

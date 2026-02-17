@@ -1,10 +1,11 @@
 import React from 'react';
-import { Info, Plus, ArrowLeftRight, TrendingUp, Users, BookOpen } from 'lucide-react';
+import { Info, ArrowLeftRight, TrendingUp, Users, BookOpen } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, 
   BarChart, Bar, XAxis, YAxis, Tooltip, 
   AreaChart, Area, CartesianGrid
 } from 'recharts';
+import { FloatingQuickActions } from './FloatingQuickActions';
 
 // --- Types & Data ---
 
@@ -174,10 +175,7 @@ export const Dashboard: React.FC = () => {
 
       </div>
 
-      {/* Floating Action Button */}
-      <button className="fixed bottom-8 left-8 w-14 h-14 bg-brand-purple text-white rounded-full shadow-lg shadow-purple-500/30 flex items-center justify-center hover:bg-purple-700 hover:scale-105 transition-all z-50">
-        <Plus className="w-8 h-8" />
-      </button>
+      <FloatingQuickActions />
 
       {/* Promo Card (Bottom Right) */}
       <div className="fixed bottom-8 right-8 z-50 hidden lg:block">

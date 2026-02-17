@@ -55,7 +55,11 @@ type StatusOption = (typeof STATUS_OPTIONS)[number];
 
 const SEARCH_FIELD_OPTIONS: SearchFieldOption[] = [
   { key: 'transactionId', label: 'رقم العمليه', getValue: (row) => row.id },
-  { key: 'customerName', label: 'اسم العميل', getValue: (row) => row.customer },
+  {
+    key: 'customerName',
+    label: 'اسم العميل',
+    getValue: (row) => `${row.customer} ${row.studentName} ${row.parentName}`.trim(),
+  },
   { key: 'customerPhone', label: 'رقم هاتف العميل', getValue: (row) => row.customerPhone },
   { key: 'customerEmail', label: 'البريد الإلكتروني للعميل', getValue: (row) => row.customerEmail },
   { key: 'parentCode', label: 'كود ولي الأمر', getValue: (row) => row.parentCode },
@@ -188,6 +192,8 @@ export const TransactionsPage: React.FC = () => {
 
   const normalizeSearchValue = (val: any): string =>
     String(val ?? '')
+      .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+      .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
       .toLowerCase()
       .replace(/[^a-z0-9\u0600-\u06ff]+/g, '');
 
@@ -295,16 +301,36 @@ export const TransactionsPage: React.FC = () => {
         .filter((row) => row.id)
     );
 
-  const saveTransactionsToServer = async (rows: TransactionRow[]): Promise<boolean> => {
+  const saveTransactionsToServer = async (
+    rows: TransactionRow[]
+  ): Promise<{ ok: boolean; error?: string }> => {
     try {
       const response = await fetch(TRANSACTIONS_API_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ transactions: rows }),
       });
-      return response.ok;
+
+      if (response.ok) {
+        return { ok: true };
+      }
+
+      let errorMessage = 'فشل غير معروف من الخادم';
+      try {
+        const payload = await response.json();
+        errorMessage = payload?.error || payload?.message || errorMessage;
+      } catch {
+        try {
+          const text = await response.text();
+          if (text) errorMessage = text;
+        } catch {
+          // ignore
+        }
+      }
+
+      return { ok: false, error: errorMessage };
     } catch {
-      return false;
+      return { ok: false, error: 'تعذر الاتصال بالخادم' };
     }
   };
 
@@ -517,13 +543,18 @@ export const TransactionsPage: React.FC = () => {
           const parsedDate = parseTransactionDate(row[dateIndex]);
           const studentNameValue = String(studentNameIndex !== -1 ? row[studentNameIndex] ?? '' : '').trim();
           const customerValue = String(row[customerIndex] ?? '').trim();
+          const normalizedCustomer = normalizeText(customerValue);
+          const resolvedCustomer =
+            normalizedCustomer === 'btc user' || normalizedCustomer === 'user' || !customerValue
+              ? studentNameValue || customerValue
+              : customerValue;
           const parentNameValue = String(parentNameIndex !== -1 ? row[parentNameIndex] ?? '' : '').trim();
           const quantityValue = String(quantityIndex !== -1 ? row[quantityIndex] ?? '' : '').trim();
           const itemAmountValue = itemAmountIndex !== -1 ? cleanNumber(row[itemAmountIndex]) : cleanNumber(row[totalIndex]);
 
           return {
             id: String(idValue).trim(),
-            customer: customerValue || studentNameValue,
+            customer: resolvedCustomer,
             customerPhone: String(mobileIndex !== -1 ? row[mobileIndex] ?? '' : '').trim(),
             customerEmail: String(emailIndex !== -1 ? row[emailIndex] ?? '' : '').trim(),
             totalNoTax: cleanNumber(row[subTotalIndex]),
@@ -561,11 +592,15 @@ export const TransactionsPage: React.FC = () => {
         setSearchQuery('');
         setFromDate('');
         setToDate('');
-        const saved = await saveTransactionsToServer(dedupedData);
+        const saveResult = await saveTransactionsToServer(dedupedData);
+        const blobHint =
+          saveResult.error?.includes('BLOB_READ_WRITE_TOKEN')
+            ? '\nتأكد من ربط Vercel Blob وإضافة المتغير BLOB_READ_WRITE_TOKEN في إعدادات المشروع ثم إعادة النشر.'
+            : '';
         alert(
-          saved
+          saveResult.ok
             ? `تم تحميل ${dedupedData.length} عملية وحفظها بنجاح`
-            : 'تم تحميل البيانات، لكن حدث خطأ أثناء الحفظ على الخادم'
+            : `تم تحميل البيانات، لكن حدث خطأ أثناء الحفظ على الخادم: ${saveResult.error}${blobHint}`
         );
       }
       

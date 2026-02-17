@@ -39,7 +39,11 @@ const parseSupabaseError = async (response: Response): Promise<string> => {
 const resolveSupabaseConfig = () => {
   const rawUrl = process.env.SUPABASE_URL || '';
   const supabaseUrl = rawUrl.replace(/\/+$/, '');
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  const serviceRoleKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    '';
   const tableFromEnv = process.env.SUPABASE_TRANSACTIONS_TABLE || DEFAULT_TABLE;
   const table = /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tableFromEnv) ? tableFromEnv : DEFAULT_TABLE;
 
@@ -53,7 +57,7 @@ export default async function handler(req: any, res: any) {
     if (!supabaseUrl || !serviceRoleKey) {
       return res.status(500).json({
         message: 'Supabase env vars are missing',
-        error: 'SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is not set',
+        error: 'SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY/SUPABASE_SERVICE_KEY/SUPABASE_ANON_KEY is not set',
       });
     }
 

@@ -211,40 +211,89 @@ export const TransactionsPage: React.FC = () => {
     return '';
   };
 
+  const mergeTransactionRows = (base: TransactionRow, incoming: TransactionRow): TransactionRow => {
+    const choose = (a: string, b: string) => (a && a.trim() ? a : b);
+    return {
+      ...base,
+      customer: choose(base.customer, incoming.customer),
+      customerPhone: choose(base.customerPhone, incoming.customerPhone),
+      customerEmail: choose(base.customerEmail, incoming.customerEmail),
+      status: choose(base.status, incoming.status),
+      branch: choose(base.branch, incoming.branch),
+      method: choose(base.method, incoming.method),
+      currency: choose(base.currency, incoming.currency),
+      provider: choose(base.provider, incoming.provider),
+      bankReferenceNumber: choose(base.bankReferenceNumber, incoming.bankReferenceNumber),
+      merchantOrderId: choose(base.merchantOrderId, incoming.merchantOrderId),
+      parentCode: choose(base.parentCode, incoming.parentCode),
+      parentName: choose(base.parentName, incoming.parentName),
+      studentId: choose(base.studentId, incoming.studentId),
+      studentName: choose(base.studentName, incoming.studentName),
+      gradeName: choose(base.gradeName, incoming.gradeName),
+      itemName: choose(base.itemName, incoming.itemName),
+      itemAmount: choose(base.itemAmount, incoming.itemAmount),
+      quantity: choose(base.quantity, incoming.quantity),
+      academicYear: choose(base.academicYear, incoming.academicYear),
+      fees: choose(base.fees, incoming.fees),
+      discount: choose(base.discount, incoming.discount),
+      totalNoTax: choose(base.totalNoTax, incoming.totalNoTax),
+      total: choose(base.total, incoming.total),
+      date: choose(base.date, incoming.date),
+      dateValue: base.dateValue ?? incoming.dateValue,
+    };
+  };
+
+  const dedupeTransactions = (rows: TransactionRow[]): TransactionRow[] => {
+    const map = new Map<string, TransactionRow>();
+    rows.forEach((row) => {
+      const key = String(row.id ?? '').trim();
+      if (!key) return;
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, row);
+        return;
+      }
+      map.set(key, mergeTransactionRows(existing, row));
+    });
+    return Array.from(map.values());
+  };
+
   const hydrateTransactions = (rows: any[]): TransactionRow[] =>
-    rows
-      .map((row) => {
-        const parsedDate = row?.dateValue ? parseTransactionDate(row.dateValue) : parseTransactionDate(row?.date);
-        return {
-          id: String(row?.id ?? '').trim(),
-          customer: String(row?.customer ?? '').trim(),
-          customerPhone: String(row?.customerPhone ?? '').trim(),
-          customerEmail: String(row?.customerEmail ?? '').trim(),
-          totalNoTax: cleanNumber(row?.totalNoTax),
-          total: cleanNumber(row?.total),
-          date: String(row?.date ?? '').trim(),
-          dateValue: parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null,
-          status: String(row?.status ?? '').trim(),
-          branch: String(row?.branch ?? '').trim(),
-          method: String(row?.method ?? '').trim(),
-          currency: String(row?.currency ?? '').trim(),
-          provider: String(row?.provider ?? '').trim(),
-          bankReferenceNumber: String(row?.bankReferenceNumber ?? '').trim(),
-          merchantOrderId: String(row?.merchantOrderId ?? '').trim(),
-          parentCode: String(row?.parentCode ?? '').trim(),
-          parentName: String(row?.parentName ?? '').trim(),
-          studentId: String(row?.studentId ?? '').trim(),
-          studentName: String(row?.studentName ?? '').trim(),
-          gradeName: String(row?.gradeName ?? '').trim(),
-          itemName: String(row?.itemName ?? '').trim(),
-          itemAmount: cleanNumber(row?.itemAmount),
-          quantity: String(row?.quantity ?? '').trim() || '1',
-          academicYear: String(row?.academicYear ?? '').trim(),
-          fees: cleanNumber(row?.fees),
-          discount: cleanNumber(row?.discount),
-        };
-      })
-      .filter((row) => row.id);
+    dedupeTransactions(
+      rows
+        .map((row) => {
+          const parsedDate = row?.dateValue ? parseTransactionDate(row.dateValue) : parseTransactionDate(row?.date);
+          return {
+            id: String(row?.id ?? '').trim(),
+            customer: String(row?.customer ?? '').trim(),
+            customerPhone: String(row?.customerPhone ?? '').trim(),
+            customerEmail: String(row?.customerEmail ?? '').trim(),
+            totalNoTax: cleanNumber(row?.totalNoTax),
+            total: cleanNumber(row?.total),
+            date: String(row?.date ?? '').trim(),
+            dateValue: parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null,
+            status: String(row?.status ?? '').trim(),
+            branch: String(row?.branch ?? '').trim(),
+            method: String(row?.method ?? '').trim(),
+            currency: String(row?.currency ?? '').trim(),
+            provider: String(row?.provider ?? '').trim(),
+            bankReferenceNumber: String(row?.bankReferenceNumber ?? '').trim(),
+            merchantOrderId: String(row?.merchantOrderId ?? '').trim(),
+            parentCode: String(row?.parentCode ?? '').trim(),
+            parentName: String(row?.parentName ?? '').trim(),
+            studentId: String(row?.studentId ?? '').trim(),
+            studentName: String(row?.studentName ?? '').trim(),
+            gradeName: String(row?.gradeName ?? '').trim(),
+            itemName: String(row?.itemName ?? '').trim(),
+            itemAmount: cleanNumber(row?.itemAmount),
+            quantity: String(row?.quantity ?? '').trim() || '1',
+            academicYear: String(row?.academicYear ?? '').trim(),
+            fees: cleanNumber(row?.fees),
+            discount: cleanNumber(row?.discount),
+          };
+        })
+        .filter((row) => row.id)
+    );
 
   const saveTransactionsToServer = async (rows: TransactionRow[]): Promise<boolean> => {
     try {
@@ -281,7 +330,13 @@ export const TransactionsPage: React.FC = () => {
         if (!response.ok) return;
         const payload = await response.json();
         if (!Array.isArray(payload?.transactions) || !isMounted) return;
-        setTransactionsData(hydrateTransactions(payload.transactions));
+        const hydrated = hydrateTransactions(payload.transactions);
+        setTransactionsData(hydrated);
+
+        // Auto-clean old duplicated saved data once after loading.
+        if (hydrated.length > 0 && payload.transactions.length !== hydrated.length) {
+          void saveTransactionsToServer(hydrated);
+        }
       } catch {
         // ignore server read errors to keep page usable
       }
@@ -496,17 +551,22 @@ export const TransactionsPage: React.FC = () => {
           } as TransactionRow;
         })
         .filter((item): item is TransactionRow => item !== null);
+      const dedupedData = dedupeTransactions(mappedData);
 
-      if (mappedData.length === 0) {
+      if (dedupedData.length === 0) {
         alert('الملف تم قراءته لكن لم يتم العثور على بيانات صالحة للعرض');
       } else {
-        setTransactionsData(mappedData);
+        setTransactionsData(dedupedData);
         setSelectedTransaction(null);
         setSearchQuery('');
         setFromDate('');
         setToDate('');
-        const saved = await saveTransactionsToServer(mappedData);
-        alert(saved ? `تم تحميل ${mappedData.length} عملية وحفظها بنجاح` : 'تم تحميل البيانات، لكن حدث خطأ أثناء الحفظ على الخادم');
+        const saved = await saveTransactionsToServer(dedupedData);
+        alert(
+          saved
+            ? `تم تحميل ${dedupedData.length} عملية وحفظها بنجاح`
+            : 'تم تحميل البيانات، لكن حدث خطأ أثناء الحفظ على الخادم'
+        );
       }
       
       // Reset input

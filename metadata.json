@@ -1,0 +1,5 @@
+{
+  "name": "Klickit Dashboard Clone",
+  "description": "A high-fidelity RTL Arabic dashboard clone of the Klickit education payment platform using React, Tailwind CSS, and Recharts.",
+  "requestFramePermissions": []
+}

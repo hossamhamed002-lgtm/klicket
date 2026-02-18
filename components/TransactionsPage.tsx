@@ -51,10 +51,16 @@ interface SearchFieldOption {
   getValue: (row: TransactionRow) => string;
 }
 
+interface TransactionExportColumn {
+  header: string;
+  getValue: (row: TransactionRow) => string;
+}
+
 type DetailsTabKey = 'payment' | 'operation' | 'customer';
 
 const STATUS_OPTIONS = ['ناجحة', 'منتظرة', 'غير ناجحة', 'مستردة', 'ملغية'] as const;
 type StatusOption = (typeof STATUS_OPTIONS)[number];
+const DEFAULT_SELECTED_STATUSES: StatusOption[] = ['ناجحة'];
 
 const SEARCH_FIELD_OPTIONS: SearchFieldOption[] = [
   { key: 'transactionId', label: 'رقم العمليه', getValue: (row) => row.id },
@@ -73,6 +79,34 @@ const SEARCH_FIELD_OPTIONS: SearchFieldOption[] = [
   { key: 'merchantOrderId', label: 'رقم العملية من قبل المؤسسة', getValue: (row) => row.merchantOrderId },
 ];
 
+const TRANSACTIONS_EXPORT_COLUMNS: TransactionExportColumn[] = [
+  { header: 'Receipt No', getValue: (row) => row.id },
+  { header: 'Full Name', getValue: (row) => row.customer },
+  { header: 'Mobile Number', getValue: (row) => row.customerPhone },
+  { header: 'Email', getValue: (row) => row.customerEmail },
+  { header: 'Sub Total', getValue: (row) => row.totalNoTax },
+  { header: 'Total Amount', getValue: (row) => row.total },
+  { header: 'Transaction Date', getValue: (row) => row.date },
+  { header: 'Order Status', getValue: (row) => row.status },
+  { header: 'Branch Name', getValue: (row) => row.branch },
+  { header: 'Payment Method', getValue: (row) => row.method },
+  { header: 'Currency', getValue: (row) => row.currency },
+  { header: 'Provider', getValue: (row) => row.provider },
+  { header: 'Bank Reference Number', getValue: (row) => row.bankReferenceNumber },
+  { header: 'Merchant Order ID', getValue: (row) => row.merchantOrderId },
+  { header: 'Parent Name', getValue: (row) => row.parentName },
+  { header: 'Parent ID', getValue: (row) => row.parentCode },
+  { header: 'Student ID', getValue: (row) => row.studentId },
+  { header: 'Student Name', getValue: (row) => row.studentName },
+  { header: 'Grade Name', getValue: (row) => row.gradeName },
+  { header: 'Item Name', getValue: (row) => row.itemName },
+  { header: 'Amount', getValue: (row) => row.itemAmount },
+  { header: 'Quantity', getValue: (row) => row.quantity },
+  { header: 'Academic Year', getValue: (row) => row.academicYear },
+  { header: 'Late Fees', getValue: (row) => row.fees },
+  { header: 'Discount', getValue: (row) => row.discount },
+];
+
 const TRANSACTIONS_API_ENDPOINT = '/api/transactions';
 
 export const TransactionsPage: React.FC = () => {
@@ -82,7 +116,7 @@ export const TransactionsPage: React.FC = () => {
   const [toDate, setToDate] = useState('');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
-  const [selectedStatuses, setSelectedStatuses] = useState<StatusOption[]>(['ناجحة']);
+  const [selectedStatuses, setSelectedStatuses] = useState<StatusOption[]>([...DEFAULT_SELECTED_STATUSES]);
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const [selectedSearchField, setSelectedSearchField] = useState<SearchFieldKey>('transactionId');
   const [searchQuery, setSearchQuery] = useState('');
@@ -195,6 +229,17 @@ export const TransactionsPage: React.FC = () => {
     const parsed = parseInputDate(dateStr);
     return parsed ? formatDateForDisplay(parsed) : '--/--/----';
   };
+
+  const todayDateRange = useMemo(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    return {
+      startMs: start.getTime(),
+      endMs: end.getTime(),
+      label: formatDateForDisplay(start),
+    };
+  }, []);
 
   const parseNumeric = (value: string): number => {
     const parsed = parseFloat(String(value ?? '').replace(/,/g, ''));
@@ -442,6 +487,13 @@ export const TransactionsPage: React.FC = () => {
     setTransactionsPage(1);
   }, [searchQuery, selectedSearchField, fromDate, toDate, selectedStatuses]);
 
+  const hasDefaultStatusFilter =
+    selectedStatuses.length === DEFAULT_SELECTED_STATUSES.length &&
+    DEFAULT_SELECTED_STATUSES.every((status) => selectedStatuses.includes(status));
+  const hasSearchQuery = Boolean(searchQuery.trim());
+  const hasManualDateFilter = Boolean(fromDate || toDate);
+  const isDefaultTodayView = !hasSearchQuery && !hasManualDateFilter && hasDefaultStatusFilter;
+
   const filteredTransactions = useMemo(() => {
     const parsedFrom = parseInputDate(fromDate);
     const parsedTo = parseInputDate(toDate);
@@ -452,7 +504,15 @@ export const TransactionsPage: React.FC = () => {
       ? new Date(parsedTo.getFullYear(), parsedTo.getMonth(), parsedTo.getDate(), 23, 59, 59, 999).getTime()
       : null;
 
-    if (fromTime === null && toTime === null) return transactionsData;
+    if (fromTime === null && toTime === null) {
+      if (!isDefaultTodayView) return transactionsData;
+
+      return transactionsData.filter((item) => {
+        if (!item.dateValue) return false;
+        const time = item.dateValue.getTime();
+        return time >= todayDateRange.startMs && time <= todayDateRange.endMs;
+      });
+    }
 
     return transactionsData.filter((item) => {
       if (!item.dateValue) return false;
@@ -461,7 +521,7 @@ export const TransactionsPage: React.FC = () => {
       if (toTime !== null && time > toTime) return false;
       return true;
     });
-  }, [transactionsData, fromDate, toDate]);
+  }, [transactionsData, fromDate, toDate, isDefaultTodayView, todayDateRange.endMs, todayDateRange.startMs]);
 
   const statusFilteredTransactions = useMemo(() => {
     if (selectedStatuses.length === STATUS_OPTIONS.length) return filteredTransactions;
@@ -656,24 +716,21 @@ export const TransactionsPage: React.FC = () => {
 
   // --- Handle File Download ---
   const handleDownload = () => {
-    if (transactionsData.length === 0) return;
+    if (displayedTransactions.length === 0) {
+      alert('لا توجد بيانات في الجدول لتحميلها');
+      return;
+    }
 
-    // Map state back to Arabic headers for the export
-    const exportData = transactionsData.map(item => ({
-      'اسم العميل': item.customer,
-      'رقم العملية': item.id,
-      'التاريخ': item.date,
-      'الحالة': item.status,
-      'الفرع': item.branch,
-      'طريقة الدفع': item.method,
-      'كود ولي الأمر': item.parentCode,
-      'الاجمالي بدون ضريبه': item.totalNoTax,
-      'الخصم': item.discount,
-      'الرسوم المتأخرة': item.fees,
-      'الاجمالي': item.total
-    }));
+    const headers = TRANSACTIONS_EXPORT_COLUMNS.map((column) => column.header);
+    const exportData = displayedTransactions.map((row) =>
+      TRANSACTIONS_EXPORT_COLUMNS.reduce<Record<string, string>>((acc, column) => {
+        acc[column.header] = column.getValue(row) ?? '';
+        return acc;
+      }, {})
+    );
 
-    const ws = utils.json_to_sheet(exportData);
+    const ws = utils.json_to_sheet(exportData, { header: headers });
+    ws['!cols'] = headers.map((header) => ({ wch: Math.max(header.length + 4, 16) }));
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Transactions");
     writeFile(wb, "transactions_export.xlsx");
@@ -696,6 +753,8 @@ export const TransactionsPage: React.FC = () => {
   const dateRangeLabel =
     fromDate || toDate
       ? `${formatInputDateLabel(fromDate)} - ${formatInputDateLabel(toDate)}`
+      : isDefaultTodayView
+      ? `${todayDateRange.label} - ${todayDateRange.label}`
       : 'الفترة الزمنية';
   const selectedSearchFieldLabel =
     SEARCH_FIELD_OPTIONS.find((option) => option.key === selectedSearchField)?.label || 'رقم العمليه';
@@ -1002,10 +1061,12 @@ export const TransactionsPage: React.FC = () => {
                  {displayedTransactions.length === 0 ? (
                             <tr>
                                 <td colSpan={11} className="py-8 text-center text-gray-400">
-                                  {transactionsData.length === 0
+                  {transactionsData.length === 0
                                     ? 'لا توجد بيانات متاحة'
                                     : filteredTransactions.length === 0
-                                    ? 'لا توجد بيانات ضمن الفترة المحددة'
+                                    ? isDefaultTodayView
+                                      ? 'لا توجد بيانات لليوم'
+                                      : 'لا توجد بيانات ضمن الفترة المحددة'
                                     : statusFilteredTransactions.length === 0
                                     ? 'لا توجد بيانات ضمن الحالة المحددة'
                                     : 'لا توجد نتائج مطابقة للبحث'}

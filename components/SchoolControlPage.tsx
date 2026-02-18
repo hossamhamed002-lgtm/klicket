@@ -11,7 +11,7 @@ import {
   ArrowDownUp,
   ArrowRight,
 } from 'lucide-react';
-import { read, utils } from 'xlsx';
+import { read, utils, writeFile } from 'xlsx';
 import { Pagination } from './Pagination';
 import { FloatingQuickActions } from './FloatingQuickActions';
 
@@ -799,10 +799,53 @@ export const SchoolControlPage: React.FC = () => {
     reader.readAsBinaryString(file);
   };
 
+  const handleParentDownload = () => {
+    if (filteredParentsData.length === 0) {
+      alert('لا توجد بيانات في جدول أولياء الأمور لتحميلها');
+      return;
+    }
+
+    const headers = ['اسم ولي الامر', 'كود ولي الامر', 'كود ولي الامر الثانى', 'البريد الإلكتروني', 'رقم الهاتف'];
+    const exportData = filteredParentsData.map((row) => ({
+      'اسم ولي الامر': row.name || '',
+      'كود ولي الامر': row.code || '',
+      'كود ولي الامر الثانى': row.code2 || '',
+      'البريد الإلكتروني': row.email || '',
+      'رقم الهاتف': row.phone || '',
+    }));
+
+    const ws = utils.json_to_sheet(exportData, { header: headers });
+    ws['!cols'] = headers.map((header) => ({ wch: Math.max(header.length + 4, 18) }));
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Parents');
+    writeFile(wb, 'parents_export.xlsx');
+  };
+
   const handleStudentUploadClick = () => {
     if (studentFileInputRef.current) {
       studentFileInputRef.current.click();
     }
+  };
+
+  const handleStudentDownload = () => {
+    if (filteredStudentsData.length === 0) {
+      alert('لا توجد بيانات في جدول الطلاب لتحميلها');
+      return;
+    }
+
+    const headers = ['اسم الطالب', 'كود الطالب', 'السنه الدراسيه', 'رقم تعريف ولي الامر'];
+    const exportData = filteredStudentsData.map((row) => ({
+      'اسم الطالب': row.name || '',
+      'كود الطالب': row.studentCode || '',
+      'السنه الدراسيه': row.grade || '',
+      'رقم تعريف ولي الامر': row.parentCode || '',
+    }));
+
+    const ws = utils.json_to_sheet(exportData, { header: headers });
+    ws['!cols'] = headers.map((header) => ({ wch: Math.max(header.length + 4, 18) }));
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'Students');
+    writeFile(wb, 'students_export.xlsx');
   };
 
   const handleStudentFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1193,7 +1236,11 @@ export const SchoolControlPage: React.FC = () => {
                 <span>رفع الملفات</span>
               </button>
 
-              <button className="flex items-center gap-2 px-6 py-2 border border-brand-purple text-brand-purple rounded-full bg-white hover:bg-purple-50 transition-colors font-bold">
+              <button
+                type="button"
+                onClick={handleParentDownload}
+                className="flex items-center gap-2 px-6 py-2 border border-brand-purple text-brand-purple rounded-full bg-white hover:bg-purple-50 transition-colors font-bold"
+              >
                 <Download className="w-4 h-4" />
                 <span>تحميل</span>
               </button>
@@ -1405,7 +1452,11 @@ export const SchoolControlPage: React.FC = () => {
                 <span>رفع الملفات</span>
               </button>
 
-              <button className="flex items-center gap-2 px-6 py-2 border border-brand-purple text-brand-purple rounded-full bg-white hover:bg-purple-50 transition-colors font-bold">
+              <button
+                type="button"
+                onClick={handleStudentDownload}
+                className="flex items-center gap-2 px-6 py-2 border border-brand-purple text-brand-purple rounded-full bg-white hover:bg-purple-50 transition-colors font-bold"
+              >
                 <Download className="w-4 h-4" />
                 <span>تحميل</span>
               </button>

@@ -1094,7 +1094,7 @@ export const SchoolControlPage: React.FC = () => {
         <ArrowRight className="w-5 h-5" />
       </div>
 
-      <div className="flex items-center gap-8 border-b border-gray-200 mb-6 overflow-x-auto">
+      <div className="sticky top-24 md:top-28 z-30 -mx-4 md:-mx-8 px-4 md:px-8 bg-[#f5f5f8] flex items-center gap-8 border-b border-gray-200 mb-6 overflow-x-auto">
         <div
           className={`pb-4 px-2 cursor-pointer transition-all flex items-center gap-2 ${
             activeTab === 'classes' ? 'border-b-2 border-brand-purple text-brand-purple' : 'text-gray-500 hover:text-gray-700'
@@ -1210,7 +1210,7 @@ export const SchoolControlPage: React.FC = () => {
 
       {activeTab === 'parents' && !selectedParent && (
         <>
-          <div className="sticky top-24 md:top-28 z-20 -mx-4 md:-mx-8 px-4 md:px-8 py-3 bg-[#f5f5f8] border-b border-gray-200">
+          <div className="sticky top-[9.25rem] md:top-[10rem] z-20 -mx-4 md:-mx-8 px-4 md:px-8 py-3 bg-[#f5f5f8] border-b border-gray-200">
             <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
             <div className="flex flex-wrap items-center gap-3 order-2 xl:order-1">
               <button

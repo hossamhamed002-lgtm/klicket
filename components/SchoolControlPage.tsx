@@ -1210,7 +1210,8 @@ export const SchoolControlPage: React.FC = () => {
 
       {activeTab === 'parents' && !selectedParent && (
         <>
-          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+          <div className="sticky top-24 md:top-28 z-20 -mx-4 md:-mx-8 px-4 md:px-8 py-3 bg-[#f5f5f8] border-b border-gray-200">
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
             <div className="flex flex-wrap items-center gap-3 order-2 xl:order-1">
               <button
                 type="button"
@@ -1258,6 +1259,7 @@ export const SchoolControlPage: React.FC = () => {
                 <Search className="w-5 h-5 text-gray-400 absolute left-4" />
               </div>
             </div>
+          </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto mt-6">

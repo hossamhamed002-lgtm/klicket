@@ -42,74 +42,91 @@ const AuthSidePanel: React.FC = () => (
       </div>
 
       <div className="relative flex justify-center mb-14">
-        <div className="relative w-[430px] h-[262px] 2xl:w-[560px] 2xl:h-[336px] rounded-[56px] bg-black p-[10px] shadow-[0_16px_30px_rgba(0,0,0,0.35)]">
-          <div className="relative h-full w-full rounded-[46px] bg-[#0e0f14] p-[10px]">
-            <span className="absolute top-[6px] left-1/2 -translate-x-1/2 h-[4px] w-[4px] rounded-full bg-[#70727d]"></span>
+        <div className="relative w-[392px] h-[240px] 2xl:w-[520px] 2xl:h-[316px] rounded-[50px] bg-black p-[9px] shadow-[0_14px_26px_rgba(0,0,0,0.33)]">
+          <div className="relative h-full w-full rounded-[42px] bg-[#0f1016] p-[9px]">
+            <span className="absolute top-[6px] left-1/2 -translate-x-1/2 h-[4px] w-[4px] rounded-full bg-[#717381]"></span>
 
-            <div className="h-full w-full rounded-[34px] bg-[#dddde3] px-4 py-3 2xl:px-5 2xl:py-4">
-              <div className="h-[56%] flex gap-4">
-                <div className="flex-1 rounded-[8px] bg-[#f5f5f8] shadow-[0_4px_10px_rgba(44,44,60,0.14)] p-3 flex flex-col">
-                  <div className="flex justify-center gap-10 text-[10px] pb-2">
-                    <span className="h-2 w-2 rounded-full bg-[#6826dd]"></span>
-                    <span className="h-2 w-2 rounded-full bg-[#ef8f2c]"></span>
-                    <span className="h-2 w-2 rounded-full bg-[#f7c53d]"></span>
-                    <span className="h-2 w-2 rounded-full bg-[#9ca4f0]"></span>
+            <div className="h-full w-full rounded-[31px] bg-[#dcdbe5] px-3.5 py-3 2xl:px-5 2xl:py-4">
+              <div className="h-[58%] flex gap-3">
+                <div className="flex-1 rounded-[8px] bg-[#f7f7fa] shadow-[0_3px_10px_rgba(44,44,60,0.14)] px-3 py-2">
+                  <div className="flex justify-center gap-10 pb-2">
+                    <span className="h-2 w-2 rounded-[2px] bg-[#6222e0]"></span>
+                    <span className="h-2 w-2 rounded-[2px] bg-[#f48f2b]"></span>
+                    <span className="h-2 w-2 rounded-[2px] bg-[#f2c237]"></span>
+                    <span className="h-2 w-2 rounded-[2px] bg-[#a9b1f4]"></span>
                   </div>
-                  <div className="flex-1 flex items-end gap-1.5 px-1">
-                    {[42, 62, 34, 54, 47, 58, 36, 51, 45, 60, 38, 52].map((h, i) => (
-                      <div key={i} className="w-full flex gap-[2px] items-end justify-center">
+
+                  <div className="flex h-[75%] items-end justify-between px-1">
+                    {[65, 49, 72, 31, 58, 46, 63, 69, 52, 37, 66, 54, 62, 33].map((h, i) => (
+                      <div key={i} className="relative h-full w-[6px] bg-[#ececf3] rounded-full overflow-hidden">
                         <span
                           style={{ height: `${h}%` }}
-                          className="w-[2px] rounded-t bg-[#f7c53d]"
-                        ></span>
-                        <span
-                          style={{ height: `${Math.max(24, h - 9)}%` }}
-                          className="w-[2px] rounded-t bg-[#6826dd]"
-                        ></span>
-                        <span
-                          style={{ height: `${Math.max(18, h - 15)}%` }}
-                          className="w-[2px] rounded-t bg-[#ef8f2c]"
-                        ></span>
-                        <span
-                          style={{ height: `${Math.max(20, h - 6)}%` }}
-                          className="w-[2px] rounded-t bg-[#9ca4f0]"
+                          className={`absolute bottom-0 left-1/2 -translate-x-1/2 w-[3px] rounded-full ${
+                            i % 4 === 0
+                              ? 'bg-[#6222e0]'
+                              : i % 4 === 1
+                              ? 'bg-[#a9b1f4]'
+                              : i % 4 === 2
+                              ? 'bg-[#f48f2b]'
+                              : 'bg-[#f2c237]'
+                          }`}
                         ></span>
                       </div>
                     ))}
                   </div>
+
+                  <div className="mt-1 flex justify-between px-1">
+                    {Array.from({ length: 14 }).map((_, i) => (
+                      <span key={i} className="text-[6px] text-[#c5c5d0]">
+                        {i + 1}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="w-[34%] flex flex-col gap-2">
+                <div className="w-[35%] flex flex-col gap-2">
                   {[
-                    ['#f5c235', '2.9k'],
-                    ['#ef8f2c', '4.1k'],
-                    ['#6826dd', '8.4k'],
+                    ['#f2c237', '28%', '3.4 K'],
+                    ['#f48f2b', '61%', '5.1 K'],
+                    ['#6222e0', '94%', '78.7 K'],
                   ].map((card, index) => (
                     <div
                       key={index}
-                      className="flex-1 rounded-[8px] bg-[#f5f5f8] shadow-[0_4px_10px_rgba(44,44,60,0.14)] px-2.5 py-2 flex items-center justify-between"
+                      className="flex-1 rounded-[8px] bg-[#f7f7fa] shadow-[0_3px_10px_rgba(44,44,60,0.14)] px-2.5 py-2 flex items-center justify-between"
                     >
-                      <div className="h-7 w-7 rounded-full border-[4px]" style={{ borderColor: card[0], borderRightColor: '#ececf2' }}></div>
-                      <span className="text-[10px] text-[#9b9ca8] font-semibold">{card[1]}</span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#f0ad2e]"></span>
+                      <div className="h-7 w-7 rounded-full border-[4px] relative" style={{ borderColor: card[0], borderRightColor: '#ececf3' }}>
+                        <span className="absolute inset-0 flex items-center justify-center text-[7px] font-semibold text-[#8f909e]">{card[1]}</span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="h-2 w-2 rounded-full border border-[#d2d2dd]"></span>
+                        <span className="mt-1 text-[9px] text-[#a0a1ad] font-semibold">{card[2]}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="mt-3 h-[40%] rounded-[8px] bg-[#f5f5f8] shadow-[0_4px_10px_rgba(44,44,60,0.14)] px-5 py-3">
-                <div className="flex items-end h-full gap-2">
-                  {[20, 34, 18, 26, 42, 19, 30, 22, 27, 35, 15, 23, 21, 33, 30, 19].map((h, i) => (
+              <div className="mt-3 h-[38%] rounded-[8px] bg-[#f7f7fa] shadow-[0_3px_10px_rgba(44,44,60,0.14)] px-5 py-2.5">
+                <div className="flex justify-center gap-6 pb-2 text-[6px] text-[#c0c1cc]">
+                  <span className="inline-flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-[#6222e0]"></i>Lorem ipsum</span>
+                  <span className="inline-flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-[#f48f2b]"></i>Lorem ipsum</span>
+                  <span className="inline-flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-[#f2c237]"></i>Lorem ipsum</span>
+                  <span className="inline-flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-[#a9b1f4]"></i>Lorem ipsum</span>
+                </div>
+                <div className="flex h-[72%] items-end gap-2">
+                  {[18, 34, 15, 25, 45, 16, 29, 18, 25, 35, 13, 21, 19, 33, 29, 16].map((h, i) => (
                     <span
                       key={i}
                       style={{ height: `${h}%` }}
-                      className={`w-full rounded-t ${
+                      className={`w-full rounded-t-[4px] ${
                         i % 4 === 0
-                          ? 'bg-[#6422d8]'
+                          ? 'bg-[#6222e0]'
                           : i % 4 === 1
-                          ? 'bg-[#d6d6e0]'
+                          ? 'bg-[#d7d7e2]'
                           : i % 4 === 2
-                          ? 'bg-[#f29a2d]'
-                          : 'bg-[#9ca4f0]'
+                          ? 'bg-[#f48f2b]'
+                          : 'bg-[#a9b1f4]'
                       }`}
                     ></span>
                   ))}
@@ -119,8 +136,8 @@ const AuthSidePanel: React.FC = () => (
           </div>
         </div>
 
-        <div className="absolute -bottom-4 h-4 w-[500px] 2xl:w-[650px] rounded-b-[16px] bg-[#9fa0ac] shadow-[0_12px_18px_rgba(0,0,0,0.3)]"></div>
-        <div className="absolute -bottom-[2px] h-2 w-24 rounded-b-full bg-[#5d5f6d]"></div>
+        <div className="absolute -bottom-4 h-4 w-[448px] 2xl:w-[596px] rounded-b-[16px] bg-[#9ea0ac] shadow-[0_12px_18px_rgba(0,0,0,0.28)]"></div>
+        <div className="absolute -bottom-[2px] h-2 w-20 rounded-b-full bg-[#5f6170]"></div>
       </div>
 
       <p className="text-center text-[18px] 2xl:text-[32px] xl:text-[23px] font-semibold text-white mb-4 tracking-wide">

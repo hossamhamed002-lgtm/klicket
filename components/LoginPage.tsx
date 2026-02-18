@@ -24,6 +24,112 @@ const AuthTopBar: React.FC = () => (
   </div>
 );
 
+const AuthSidePanel: React.FC = () => (
+  <div className="hidden xl:flex xl:w-[44%] relative overflow-hidden bg-[#efedf4]">
+    <div className="absolute top-[-20%] right-[-10%] h-[64%] w-[76%] rotate-45 bg-white/30"></div>
+    <div className="absolute top-[18%] right-[18%] h-[54%] w-[54%] rotate-45 bg-white/25"></div>
+    <div
+      className="absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-b from-[#6b13d7] to-[#5600bd]"
+      style={{ clipPath: 'polygon(0 22%, 100% 56%, 100% 100%, 0% 100%)' }}
+    ></div>
+
+    <div className="relative z-10 w-full h-full flex flex-col justify-between px-12 py-12">
+      <div className="text-center text-[#8e8f96] font-bold italic leading-[1.4] tracking-wide">
+        <p className="text-[24px] 2xl:text-[42px] xl:text-[30px] whitespace-nowrap">Managing your payments is</p>
+        <p className="text-[24px] 2xl:text-[42px] xl:text-[30px] whitespace-nowrap mt-1">
+          .one <span className="text-[#5e12d3]">Klick</span> away
+        </p>
+      </div>
+
+      <div className="relative flex justify-center mb-14">
+        <div className="relative w-[430px] h-[262px] 2xl:w-[560px] 2xl:h-[336px] rounded-[56px] bg-black p-[10px] shadow-[0_16px_30px_rgba(0,0,0,0.35)]">
+          <div className="relative h-full w-full rounded-[46px] bg-[#0e0f14] p-[10px]">
+            <span className="absolute top-[6px] left-1/2 -translate-x-1/2 h-[4px] w-[4px] rounded-full bg-[#70727d]"></span>
+
+            <div className="h-full w-full rounded-[34px] bg-[#dddde3] px-4 py-3 2xl:px-5 2xl:py-4">
+              <div className="h-[56%] flex gap-4">
+                <div className="flex-1 rounded-[8px] bg-[#f5f5f8] shadow-[0_4px_10px_rgba(44,44,60,0.14)] p-3 flex flex-col">
+                  <div className="flex justify-center gap-10 text-[10px] pb-2">
+                    <span className="h-2 w-2 rounded-full bg-[#6826dd]"></span>
+                    <span className="h-2 w-2 rounded-full bg-[#ef8f2c]"></span>
+                    <span className="h-2 w-2 rounded-full bg-[#f7c53d]"></span>
+                    <span className="h-2 w-2 rounded-full bg-[#9ca4f0]"></span>
+                  </div>
+                  <div className="flex-1 flex items-end gap-1.5 px-1">
+                    {[42, 62, 34, 54, 47, 58, 36, 51, 45, 60, 38, 52].map((h, i) => (
+                      <div key={i} className="w-full flex gap-[2px] items-end justify-center">
+                        <span
+                          style={{ height: `${h}%` }}
+                          className="w-[2px] rounded-t bg-[#f7c53d]"
+                        ></span>
+                        <span
+                          style={{ height: `${Math.max(24, h - 9)}%` }}
+                          className="w-[2px] rounded-t bg-[#6826dd]"
+                        ></span>
+                        <span
+                          style={{ height: `${Math.max(18, h - 15)}%` }}
+                          className="w-[2px] rounded-t bg-[#ef8f2c]"
+                        ></span>
+                        <span
+                          style={{ height: `${Math.max(20, h - 6)}%` }}
+                          className="w-[2px] rounded-t bg-[#9ca4f0]"
+                        ></span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="w-[34%] flex flex-col gap-2">
+                  {[
+                    ['#f5c235', '2.9k'],
+                    ['#ef8f2c', '4.1k'],
+                    ['#6826dd', '8.4k'],
+                  ].map((card, index) => (
+                    <div
+                      key={index}
+                      className="flex-1 rounded-[8px] bg-[#f5f5f8] shadow-[0_4px_10px_rgba(44,44,60,0.14)] px-2.5 py-2 flex items-center justify-between"
+                    >
+                      <div className="h-7 w-7 rounded-full border-[4px]" style={{ borderColor: card[0], borderRightColor: '#ececf2' }}></div>
+                      <span className="text-[10px] text-[#9b9ca8] font-semibold">{card[1]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 h-[40%] rounded-[8px] bg-[#f5f5f8] shadow-[0_4px_10px_rgba(44,44,60,0.14)] px-5 py-3">
+                <div className="flex items-end h-full gap-2">
+                  {[20, 34, 18, 26, 42, 19, 30, 22, 27, 35, 15, 23, 21, 33, 30, 19].map((h, i) => (
+                    <span
+                      key={i}
+                      style={{ height: `${h}%` }}
+                      className={`w-full rounded-t ${
+                        i % 4 === 0
+                          ? 'bg-[#6422d8]'
+                          : i % 4 === 1
+                          ? 'bg-[#d6d6e0]'
+                          : i % 4 === 2
+                          ? 'bg-[#f29a2d]'
+                          : 'bg-[#9ca4f0]'
+                      }`}
+                    ></span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="absolute -bottom-4 h-4 w-[500px] 2xl:w-[650px] rounded-b-[16px] bg-[#9fa0ac] shadow-[0_12px_18px_rgba(0,0,0,0.3)]"></div>
+        <div className="absolute -bottom-[2px] h-2 w-24 rounded-b-full bg-[#5d5f6d]"></div>
+      </div>
+
+      <p className="text-center text-[18px] 2xl:text-[32px] xl:text-[23px] font-semibold text-white mb-4 tracking-wide">
+        ! Welcome to <span className="font-bold">Klickit's</span> dashboard
+      </p>
+    </div>
+  </div>
+);
+
 export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,42 +153,46 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
   if (isForgotPassword) {
     return (
-      <div className="min-h-screen w-full bg-[#f5f5f8] flex justify-center" dir="rtl">
-        <div className="w-full max-w-[1120px] px-8 md:px-14 2xl:px-20 pt-12 pb-10">
-          <AuthTopBar />
+      <div className="min-h-screen w-full bg-[#f5f5f8] flex overflow-hidden" dir="ltr">
+        <AuthSidePanel />
 
-          <form onSubmit={handleForgotPasswordSubmit} className="max-w-[980px] mx-auto mt-28 md:mt-36">
-            <div className="group">
-              <label className="block text-base md:text-2xl 2xl:text-[38px] text-[#696971] font-semibold mb-6 md:mb-8 group-focus-within:text-[#5f13d6] transition-colors">
-                من فضلك ادخل بريدك الإلكتروني او رقم الموبايل *
-              </label>
-              <input
-                type="text"
-                value={recoveryIdentifier}
-                onChange={(e) => setRecoveryIdentifier(e.target.value)}
-                className="w-full bg-transparent border-b-[2px] border-[#cfcfd6] pb-4 md:pb-5 text-lg md:text-xl 2xl:text-[26px] text-[#55555d] focus:outline-none focus:border-[#6c24dc] transition-colors"
-                dir="ltr"
-                required
-              />
-            </div>
+        <div className="w-full xl:w-[56%] flex justify-center" dir="rtl">
+          <div className="w-full max-w-[980px] px-8 md:px-14 2xl:px-20 pt-12 pb-10">
+            <AuthTopBar />
 
-            <button
-              type="submit"
-              className="mt-20 md:mt-24 w-full rounded-full text-white text-lg md:text-xl 2xl:text-[28px] font-bold py-4 md:py-5 bg-gradient-to-r from-[#7a39eb] to-[#7f3af0] hover:from-[#6f2de3] hover:to-[#7430e6] transition-all shadow-[0_20px_35px_-25px_rgba(102,46,207,0.8)]"
-            >
-              ارسال الكود
-            </button>
+            <form onSubmit={handleForgotPasswordSubmit} className="max-w-[760px] mx-auto mt-8 md:mt-14">
+              <div className="group">
+                <label className="block text-base md:text-lg 2xl:text-[28px] text-[#6f6f76] font-semibold mb-6 group-focus-within:text-[#5f13d6] transition-colors">
+                  من فضلك ادخل بريدك الإلكتروني او رقم الموبايل *
+                </label>
+                <input
+                  type="text"
+                  value={recoveryIdentifier}
+                  onChange={(e) => setRecoveryIdentifier(e.target.value)}
+                  className="w-full bg-transparent border-b-[2px] border-[#cfcfd6] pb-4 text-lg md:text-xl 2xl:text-[24px] text-[#55555d] focus:outline-none focus:border-[#6c24dc] transition-colors"
+                  dir="ltr"
+                  required
+                />
+              </div>
 
-            <div className="mt-16 text-right">
               <button
-                type="button"
-                onClick={() => setIsForgotPassword(false)}
-                className="text-xl md:text-3xl 2xl:text-[44px] font-medium text-[#5f6068]"
+                type="submit"
+                className="mt-16 md:mt-20 w-full rounded-full text-white text-lg md:text-xl 2xl:text-[28px] font-bold py-4 md:py-5 bg-gradient-to-r from-[#7a39eb] to-[#7f3af0] hover:from-[#6f2de3] hover:to-[#7430e6] transition-all shadow-[0_20px_35px_-25px_rgba(102,46,207,0.8)]"
               >
-                أعدني إلى <span className="text-[#6b23db]">تسجيل دخول</span>
+                ارسال الكود
               </button>
-            </div>
-          </form>
+
+              <div className="mt-14 text-right">
+                <button
+                  type="button"
+                  onClick={() => setIsForgotPassword(false)}
+                  className="text-base md:text-lg 2xl:text-[24px] font-medium text-[#5f6068]"
+                >
+                  أعدني إلى <span className="text-[#6b23db]">تسجيل دخول</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
     );
@@ -90,77 +200,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
   return (
     <div className="min-h-screen w-full bg-[#f5f5f8] flex overflow-hidden" dir="ltr">
-      <div className="hidden xl:flex xl:w-[44%] relative overflow-hidden bg-[#efedf4]">
-        <div className="absolute top-[-20%] right-[-10%] h-[64%] w-[76%] rotate-45 bg-white/30"></div>
-        <div className="absolute top-[18%] right-[18%] h-[54%] w-[54%] rotate-45 bg-white/25"></div>
-        <div
-          className="absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-b from-[#6b13d7] to-[#5600bd]"
-          style={{ clipPath: 'polygon(0 22%, 100% 56%, 100% 100%, 0% 100%)' }}
-        ></div>
-
-        <div className="relative z-10 w-full h-full flex flex-col justify-between px-12 py-12">
-          <div className="text-center text-[#8e8f96] font-bold italic leading-[1.4] tracking-wide">
-            <p className="text-[24px] 2xl:text-[42px] xl:text-[30px] whitespace-nowrap">Managing your payments is</p>
-            <p className="text-[24px] 2xl:text-[42px] xl:text-[30px] whitespace-nowrap mt-1">
-              .one <span className="text-[#5e12d3]">Klick</span> away
-            </p>
-          </div>
-
-          <div className="relative flex justify-center mb-14">
-            <div className="relative w-[360px] h-[215px] 2xl:w-[500px] 2xl:h-[300px] rounded-[30px] border-[8px] border-black bg-[#e8e8ed] p-3.5 shadow-2xl overflow-hidden">
-              <div className="h-[56%] rounded-[10px] bg-white shadow-sm p-4 flex gap-4">
-                <div className="flex-1 rounded-[8px] bg-[#f6f6f8] p-3 flex items-end gap-2">
-                  {[56, 72, 46, 82, 44, 68, 50, 76, 58, 67].map((h, index) => (
-                    <span
-                      key={index}
-                      style={{ height: `${h}%` }}
-                      className={`w-full rounded-t ${
-                        index % 3 === 0 ? 'bg-[#6a25d9]' : index % 3 === 1 ? 'bg-[#f7c442]' : 'bg-[#8c94f3]'
-                      }`}
-                    ></span>
-                  ))}
-                </div>
-                <div className="w-[34%] space-y-3">
-                  {[['#f7bb42', '35%'], ['#ef8f2c', '52%'], ['#6a25d9', '65%']].map((card, index) => (
-                    <div key={index} className="rounded-[8px] bg-[#f9f9fb] shadow-sm px-3 py-2 flex items-center gap-2">
-                      <div
-                        className="h-7 w-7 rounded-full border-[3px]"
-                        style={{ borderColor: card[0], borderRightColor: '#eee' }}
-                      ></div>
-                      <div className="flex-1">
-                        <div className="h-1.5 w-10 rounded bg-[#e2e2ea]"></div>
-                      </div>
-                      <span className="text-[10px] text-[#aeafba]">{card[1]}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="mt-4 h-[34%] rounded-[10px] bg-white shadow-sm p-4 flex items-end gap-2">
-                {[22, 48, 30, 58, 33, 51, 26, 46, 40, 60, 34, 43].map((h, index) => (
-                  <span
-                    key={index}
-                    style={{ height: `${h}%` }}
-                    className={`w-full rounded-t ${
-                      index % 4 === 0
-                        ? 'bg-[#6a25d9]'
-                        : index % 4 === 1
-                        ? 'bg-[#d8d8e2]'
-                        : index % 4 === 2
-                        ? 'bg-[#f69527]'
-                        : 'bg-[#9ea4f0]'
-                    }`}
-                  ></span>
-                ))}
-              </div>
-            </div>
-            <div className="absolute -bottom-4 h-4 w-[450px] 2xl:w-[620px] rounded-b-[14px] bg-[#94949e] shadow-xl"></div>
-          </div>
-
-          <p className="text-center text-[18px] 2xl:text-[32px] xl:text-[23px] font-semibold text-white mb-4 tracking-wide">
-            ! Welcome to <span className="font-bold">Klickit's</span> dashboard
-          </p>
-        </div>
-      </div>
+      <AuthSidePanel />
 
       <div className="w-full xl:w-[56%] flex justify-center" dir="rtl">
         <div className="w-full max-w-[980px] px-8 md:px-14 2xl:px-20 pt-12 pb-10">

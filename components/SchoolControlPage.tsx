@@ -42,6 +42,7 @@ interface TransactionLiteRow {
   status: string;
   currency: string;
   date: string;
+  branch: string;
   method: string;
   itemName: string;
   academicYear: string;
@@ -258,11 +259,15 @@ export const SchoolControlPage: React.FC = () => {
   const [transactionsData, setTransactionsData] = useState<TransactionLiteRow[]>([]);
 
   const [selectedParent, setSelectedParent] = useState<ParentRow | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<StudentRow | null>(null);
   const [parentSearch, setParentSearch] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
+  const [selectedStudentGradeFilter, setSelectedStudentGradeFilter] = useState('');
   const [classSearch, setClassSearch] = useState('');
   const [parentChildSearchByKey, setParentChildSearchByKey] = useState<Record<string, string>>({});
   const [expandedParentTransactionKey, setExpandedParentTransactionKey] = useState<string | null>(null);
+  const [studentPaymentSearch, setStudentPaymentSearch] = useState('');
+  const [expandedStudentTransactionKey, setExpandedStudentTransactionKey] = useState<string | null>(null);
   const [parentsPage, setParentsPage] = useState(1);
   const [parentsPageSize, setParentsPageSize] = useState(5);
   const [studentsPage, setStudentsPage] = useState(1);
@@ -356,6 +361,14 @@ export const SchoolControlPage: React.FC = () => {
   }, [activeTab]);
 
   useEffect(() => {
+    if (activeTab !== 'students') {
+      setSelectedStudent(null);
+      setStudentPaymentSearch('');
+      setExpandedStudentTransactionKey(null);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
     setParentsPage(1);
   }, [parentSearch]);
 
@@ -368,9 +381,18 @@ export const SchoolControlPage: React.FC = () => {
   }, [classSearch]);
 
   useEffect(() => {
+    setStudentsPage(1);
+  }, [selectedStudentGradeFilter]);
+
+  useEffect(() => {
     setParentChildSearchByKey({});
     setExpandedParentTransactionKey(null);
   }, [selectedParent?.code, selectedParent?.code2]);
+
+  useEffect(() => {
+    setStudentPaymentSearch('');
+    setExpandedStudentTransactionKey(null);
+  }, [selectedStudent?.studentCode, selectedStudent?.name]);
 
   useEffect(() => {
     if (!isAnyDrawerOpen) return;
@@ -421,6 +443,7 @@ export const SchoolControlPage: React.FC = () => {
             status: String(row?.status ?? '').trim(),
             currency: String(row?.currency ?? 'EGP').trim(),
             date: String(row?.date ?? '').trim(),
+            branch: String(row?.branch ?? '').trim(),
             method: String(row?.method ?? '').trim(),
             itemName: String(row?.itemName ?? '').trim(),
             academicYear: String(row?.academicYear ?? '').trim(),
@@ -672,6 +695,7 @@ export const SchoolControlPage: React.FC = () => {
   const openStudentAddDrawer = () => {
     setSelectedParent(null);
     setActiveTab('students');
+    setSelectedStudent(null);
     setStudentEditKey(null);
     setStudentAddForm(buildStudentAddInitialForm(false));
     setStudentParentSearch('');
@@ -813,6 +837,9 @@ export const SchoolControlPage: React.FC = () => {
     }
 
     setIsSavingStudentAdd(false);
+    if (isEditingStudent) {
+      setSelectedStudent(nextStudent);
+    }
     handleCloseStudentAdd();
   };
 
@@ -836,6 +863,7 @@ export const SchoolControlPage: React.FC = () => {
 
   const handleClassViewStudents = (className: string) => {
     setActiveTab('students');
+    setSelectedStudent(null);
     setStudentSearch(className === 'غير محدد' ? '' : className);
     setStudentsPage(1);
   };
@@ -1036,14 +1064,16 @@ export const SchoolControlPage: React.FC = () => {
 
   const filteredStudentsData = useMemo(() => {
     const query = normalizeKey(studentSearch);
-    if (!query) return studentsData;
+    const selectedGrade = normalizeKey(selectedStudentGradeFilter);
 
-    return studentsData.filter((row) =>
-      [row.name, row.studentCode, row.grade, row.parentCode, row.parentName, row.externalId]
+    return studentsData.filter((row) => {
+      if (selectedGrade && normalizeKey(row.grade) !== selectedGrade) return false;
+      if (!query) return true;
+      return [row.name, row.studentCode, row.grade, row.parentCode, row.parentName, row.externalId]
         .map((value) => normalizeKey(value))
-        .some((value) => value.includes(query))
-    );
-  }, [studentsData, studentSearch]);
+        .some((value) => value.includes(query));
+    });
+  }, [studentsData, studentSearch, selectedStudentGradeFilter]);
 
   const parentSelectOptions = useMemo(() => {
     const byCode = new Map<string, { code: string; name: string }>();
@@ -1254,6 +1284,62 @@ export const SchoolControlPage: React.FC = () => {
   const parentTransactionsCount = useMemo(
     () => parentChildrenPayments.reduce((sum, child) => sum + child.transactions.length, 0),
     [parentChildrenPayments]
+  );
+
+  const selectedStudentParent = useMemo(() => {
+    if (!selectedStudent) return null;
+    const normalizedParentCode = normalizeKey(selectedStudent.parentCode);
+    if (!normalizedParentCode) return null;
+
+    return (
+      parentsData.find(
+        (parent) =>
+          normalizeKey(parent.code) === normalizedParentCode ||
+          normalizeKey(parent.code2) === normalizedParentCode
+      ) || null
+    );
+  }, [selectedStudent, parentsData]);
+
+  const selectedStudentTransactions = useMemo(() => {
+    if (!selectedStudent) return [];
+    const normalizedStudentCode = normalizeKey(selectedStudent.studentCode);
+    const normalizedStudentName = normalizeKey(selectedStudent.name);
+    const normalizedParentCode = normalizeKey(selectedStudent.parentCode);
+
+    return transactionsData
+      .filter((tx) => {
+        const byCode =
+          normalizedStudentCode && normalizeKey(tx.studentId) === normalizedStudentCode;
+        const byName = normalizedStudentName && normalizeKey(tx.studentName) === normalizedStudentName;
+        if (!byCode && !byName) return false;
+        if (!normalizedParentCode) return true;
+        return normalizeKey(tx.parentCode) === normalizedParentCode;
+      })
+      .sort((a, b) => {
+        const dateDiff = parseDateToTimestamp(b.date) - parseDateToTimestamp(a.date);
+        if (dateDiff !== 0) return dateDiff;
+        return String(b.id).localeCompare(String(a.id), 'en');
+      });
+  }, [selectedStudent, transactionsData]);
+
+  const filteredSelectedStudentTransactions = useMemo(() => {
+    const query = normalizeKey(studentPaymentSearch);
+    if (!query) return selectedStudentTransactions;
+
+    return selectedStudentTransactions.filter((tx) =>
+      normalizeKey(
+        `${tx.itemName} ${tx.id} ${tx.merchantOrderId} ${tx.studentName} ${tx.date} ${tx.method}`
+      ).includes(query)
+    );
+  }, [selectedStudentTransactions, studentPaymentSearch]);
+
+  const selectedStudentPaidAmount = useMemo(
+    () =>
+      selectedStudentTransactions.reduce(
+        (sum, tx) => (isSuccessfulStatus(tx.status) ? sum + parseAmount(tx.total) : sum),
+        0
+      ),
+    [selectedStudentTransactions]
   );
 
   return (
@@ -1725,7 +1811,7 @@ export const SchoolControlPage: React.FC = () => {
         </div>
       )}
 
-      {activeTab === 'students' && (
+      {activeTab === 'students' && !selectedStudent && (
         <>
           <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
             <div className="flex flex-wrap items-center gap-3 order-2 xl:order-1">
@@ -1762,10 +1848,23 @@ export const SchoolControlPage: React.FC = () => {
                 <span>تحميل</span>
               </button>
 
-              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-md border border-gray-200 shadow-sm cursor-pointer hover:bg-gray-50 mr-2">
-                <ChevronDown className="w-4 h-4 text-gray-400" />
-                <span className="text-sm font-bold text-gray-700">All</span>
-                <span className="text-sm text-gray-500">: الصف الدراسي</span>
+              <div className="relative bg-white px-4 py-2 rounded-md border border-gray-200 shadow-sm mr-2 min-w-[190px]">
+                <select
+                  value={selectedStudentGradeFilter}
+                  onChange={(e) => setSelectedStudentGradeFilter(e.target.value)}
+                  className="appearance-none bg-transparent text-sm font-bold text-gray-700 pr-16 pl-6 outline-none cursor-pointer w-full"
+                >
+                  <option value="">All</option>
+                  {studentGradeOptions.map((grade) => (
+                    <option key={grade} value={grade}>
+                      {grade}
+                    </option>
+                  ))}
+                </select>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-500 pointer-events-none">
+                  : الصف الدراسي
+                </span>
+                <ChevronDown className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
 
@@ -1818,7 +1917,15 @@ export const SchoolControlPage: React.FC = () => {
                 ) : (
                   paginatedStudentsData.map((row, index) => (
                     <tr key={`${row.studentCode}-${index}`} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <td className="py-4 px-4 font-semibold">{row.name || '-'}</td>
+                      <td className="py-4 px-4 font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStudent(row)}
+                          className="text-right text-brand-purple hover:underline"
+                        >
+                          {row.name || '-'}
+                        </button>
+                      </td>
                       <td className="py-4 px-4 text-gray-500 font-mono">{row.studentCode || '-'}</td>
                       <td className="py-4 px-4 text-gray-500">{row.grade || '-'}</td>
                       <td className="py-4 px-4 text-gray-500 font-mono">{row.parentCode || '-'}</td>
@@ -1829,6 +1936,243 @@ export const SchoolControlPage: React.FC = () => {
             </table>
           </div>
         </>
+      )}
+
+      {activeTab === 'students' && selectedStudent && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-3xl font-bold text-gray-700">{selectedStudent.name || 'الطالب'}</h3>
+            <button
+              type="button"
+              onClick={() => setSelectedStudent(null)}
+              className="flex items-center gap-2 px-4 py-2 border border-brand-purple text-brand-purple rounded-full hover:bg-purple-50 transition-colors"
+            >
+              <span>رجوع</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
+            <div className="xl:col-span-8 space-y-4">
+              <div className="bg-white rounded-xl border border-gray-100 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-md border border-gray-200">
+                    <ChevronDown className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm font-bold text-gray-700">EGP</span>
+                    <span className="text-sm text-gray-500">: العملة</span>
+                  </div>
+                  <span className="text-gray-600 text-xl">Students's Balance</span>
+                </div>
+                <div className="flex items-end justify-between">
+                  <div>
+                    <div className="text-gray-500 text-lg mb-1">المدفوع</div>
+                    <div className="text-4xl font-bold text-brand-purple" dir="ltr">
+                      {formatAmount(selectedStudentPaidAmount)}
+                    </div>
+                  </div>
+                  <div className="text-green-500 text-sm font-semibold">EGP</div>
+                </div>
+                <div className="w-full h-3 bg-gray-200 rounded-full mt-5" />
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                  <h4 className="text-2xl font-bold text-gray-700">المدفوعات</h4>
+                  <div className="text-brand-purple text-2xl font-bold flex items-center gap-2">
+                    <span>{filteredSelectedStudentTransactions.length}</span>
+                    <span>المدفوع</span>
+                  </div>
+                </div>
+
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-4">
+                  <button
+                    type="button"
+                    onClick={() => window.alert(`طلب دفع فوري للطالب ${selectedStudent.name || ''}`)}
+                    className="px-5 py-2 rounded-full border border-[#9b79e8] text-brand-purple font-bold hover:bg-purple-50 transition-colors"
+                  >
+                    طلب دفع فوري
+                  </button>
+                  <div className="relative w-full max-w-md">
+                    <input
+                      type="text"
+                      value={studentPaymentSearch}
+                      onChange={(e) => setStudentPaymentSearch(e.target.value)}
+                      placeholder="بحث خلال الاسم او رقم العملية"
+                      className="w-full rounded-full border border-gray-200 bg-gray-50 py-2 pr-4 pl-10 text-sm text-gray-700 outline-none focus:border-brand-purple"
+                    />
+                    <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+
+                {filteredSelectedStudentTransactions.length === 0 ? (
+                  <div className="p-10 text-center">
+                    <p className="text-gray-400 text-5xl font-bold mb-3">لا يوجد مدفوعات</p>
+                    <button
+                      type="button"
+                      onClick={() => window.alert(`طلب دفع فوري للطالب ${selectedStudent.name || ''}`)}
+                      className="px-8 py-2 rounded-full border border-[#9b79e8] text-brand-purple font-bold hover:bg-purple-50 transition-colors"
+                    >
+                      طلب دفع فوري
+                    </button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[840px] border-collapse">
+                      <thead>
+                        <tr className="text-gray-700 text-sm font-bold border-b border-gray-100">
+                          <th className="py-3 px-4 text-right">Payment Name</th>
+                          <th className="py-3 px-4 text-right">Transaction Number</th>
+                          <th className="py-3 px-4 text-right">Order Date</th>
+                          <th className="py-3 px-4 text-right">Payment Method</th>
+                          <th className="py-3 px-4 text-right">Amount</th>
+                          <th className="py-3 px-4 text-right">Academic Year</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-gray-600 text-sm">
+                        {filteredSelectedStudentTransactions.map((tx, index) => {
+                          const rowKey = `student-${selectedStudent.studentCode}-${tx.id}-${index}`;
+                          const isExpanded = expandedStudentTransactionKey === rowKey;
+                          return (
+                            <React.Fragment key={rowKey}>
+                              <tr
+                                className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
+                                onClick={() =>
+                                  setExpandedStudentTransactionKey((current) =>
+                                    current === rowKey ? null : rowKey
+                                  )
+                                }
+                              >
+                                <td className="py-3 px-4">{tx.itemName || 'Tuition Fees'}</td>
+                                <td className="py-3 px-4 font-mono">{tx.id || '-'}</td>
+                                <td className="py-3 px-4 font-mono">{tx.date || '-'}</td>
+                                <td className="py-3 px-4">{tx.method || '-'}</td>
+                                <td className="py-3 px-4 font-semibold" dir="ltr">
+                                  {formatAmount(parseAmount(tx.total), tx.currency || 'EGP')}
+                                </td>
+                                <td className="py-3 px-4">{tx.academicYear || selectedStudent.grade || '-'}</td>
+                              </tr>
+                              {isExpanded && (
+                                <tr className="bg-[#f8f5ff] border-b border-gray-100">
+                                  <td colSpan={6} className="px-4 py-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                        <div className="text-gray-500 mb-1">Merchant Order ID</div>
+                                        <div className="font-semibold">{tx.merchantOrderId || '-'}</div>
+                                      </div>
+                                      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                        <div className="text-gray-500 mb-1">Bank Reference</div>
+                                        <div className="font-semibold">{tx.bankReferenceNumber || '-'}</div>
+                                      </div>
+                                      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                        <div className="text-gray-500 mb-1">Provider</div>
+                                        <div className="font-semibold">{tx.provider || '-'}</div>
+                                      </div>
+                                      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                        <div className="text-gray-500 mb-1">Status</div>
+                                        <div className="font-semibold">{tx.status || '-'}</div>
+                                      </div>
+                                      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                        <div className="text-gray-500 mb-1">Subtotal</div>
+                                        <div className="font-semibold" dir="ltr">
+                                          {formatAmount(parseAmount(tx.totalNoTax), tx.currency || 'EGP')}
+                                        </div>
+                                      </div>
+                                      <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                        <div className="text-gray-500 mb-1">Fees / Discount</div>
+                                        <div className="font-semibold" dir="ltr">
+                                          {formatAmount(parseAmount(tx.fees), tx.currency || 'EGP')} /{' '}
+                                          {formatAmount(parseAmount(tx.discount), tx.currency || 'EGP')}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="xl:col-span-4 space-y-4">
+              <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <div className="p-6 flex flex-col items-center text-center border-b border-gray-100">
+                  <div className="h-16 w-16 rounded-lg bg-purple-100 text-brand-purple text-4xl font-bold flex items-center justify-center mb-4">
+                    {(selectedStudent.name || '-').trim().charAt(0) || '-'}
+                  </div>
+                  <h5 className="text-3xl font-bold text-gray-700 leading-tight">{selectedStudent.name || '-'}</h5>
+                  <div className="mt-3 text-gray-700 text-2xl font-semibold font-mono">
+                    {selectedStudent.studentCode || '-'}
+                  </div>
+                </div>
+                <div className="p-4 text-gray-600 text-sm space-y-2">
+                  <div className="flex justify-end mb-1">
+                    <button
+                      type="button"
+                      onClick={() => openStudentEditDrawer(selectedStudent)}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-brand-purple border border-[#d8c9f8] hover:bg-purple-50 transition-colors"
+                    >
+                      <Edit className="w-4 h-4" />
+                      <span className="font-semibold">تعديل الطالب</span>
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>الصفوف الدراسية</span>
+                    <span className="font-semibold">{selectedStudent.grade || '-'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>رقم التعريف الخارجي</span>
+                    <span className="font-semibold">{selectedStudent.externalId || '-'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>رقم تعريف ولي الامر</span>
+                    <span className="font-semibold font-mono">{selectedStudent.parentCode || '-'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>الفرع</span>
+                    <span className="font-semibold">
+                      {selectedStudentTransactions[0]?.branch || 'الفردوس الخاصة بالغربية'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl border border-gray-100 p-5">
+                <h4 className="text-xl font-bold text-gray-700 mb-4">معلومات ولي الامر</h4>
+                <div className="space-y-3 text-gray-700">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">اسم ولي الامر</span>
+                    <span className="font-semibold">
+                      {selectedStudentParent?.name || selectedStudent.parentName || '-'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">رقم تعريف ولي الامر</span>
+                    <span className="font-semibold font-mono">
+                      {selectedStudentParent?.code || selectedStudent.parentCode || '-'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">رقم هاتف المحمول</span>
+                    <span className="font-semibold font-mono">
+                      {selectedStudentParent?.phone || '-'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">البريد الالكتروني</span>
+                    <span className="font-semibold" dir="ltr">
+                      {selectedStudentParent?.email || '-'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {isParentAddOpen && (
@@ -2265,7 +2609,7 @@ export const SchoolControlPage: React.FC = () => {
         />
       )}
 
-      {activeTab === 'students' && (
+      {activeTab === 'students' && !selectedStudent && (
         <Pagination
           totalItems={filteredStudentsData.length}
           currentPage={studentsPage}

@@ -106,10 +106,18 @@ interface StudentAddForm {
   parentCode: string;
 }
 
+interface StudentQuickPaymentForm {
+  userEmail: string;
+  paymentMethod: string;
+  amount: string;
+  currency: string;
+}
+
 type ActiveTab = 'parents' | 'students' | 'classes';
 
 const TRANSACTIONS_API_ENDPOINT = '/api/transactions';
 const SCHOOL_CONTROL_API_ENDPOINT = '/api/school-control';
+const STUDENT_QUICK_PAYMENT_METHODS = ['BTC-POS-Fawry', 'BTC-POS-Card', 'Cash'];
 
 const normalizeText = (value: any): string =>
   String(value ?? '')
@@ -277,11 +285,13 @@ export const SchoolControlPage: React.FC = () => {
   const [isParentEditOpen, setIsParentEditOpen] = useState(false);
   const [isParentAddOpen, setIsParentAddOpen] = useState(false);
   const [isStudentAddOpen, setIsStudentAddOpen] = useState(false);
+  const [isStudentQuickPaymentOpen, setIsStudentQuickPaymentOpen] = useState(false);
   const [studentEditKey, setStudentEditKey] = useState<string | null>(null);
   const [parentEditKey, setParentEditKey] = useState('');
   const [isSavingParentEdit, setIsSavingParentEdit] = useState(false);
   const [isSavingParentAdd, setIsSavingParentAdd] = useState(false);
   const [isSavingStudentAdd, setIsSavingStudentAdd] = useState(false);
+  const [isSubmittingStudentQuickPayment, setIsSubmittingStudentQuickPayment] = useState(false);
   const [parentEditForm, setParentEditForm] = useState<ParentEditForm>({
     firstName: '',
     familyName: '',
@@ -310,6 +320,12 @@ export const SchoolControlPage: React.FC = () => {
     grade: '',
     parentCode: '',
   });
+  const [studentQuickPaymentForm, setStudentQuickPaymentForm] = useState<StudentQuickPaymentForm>({
+    userEmail: '',
+    paymentMethod: STUDENT_QUICK_PAYMENT_METHODS[0],
+    amount: '0',
+    currency: 'EGP',
+  });
   const [studentParentSearch, setStudentParentSearch] = useState('');
   const [isStudentParentDropdownOpen, setIsStudentParentDropdownOpen] = useState(false);
 
@@ -318,7 +334,7 @@ export const SchoolControlPage: React.FC = () => {
   const studentParentDropdownRef = useRef<HTMLDivElement>(null);
   const parentsDataRef = useRef<ParentRow[]>([]);
   const studentsDataRef = useRef<StudentRow[]>([]);
-  const isAnyDrawerOpen = isParentEditOpen || isParentAddOpen || isStudentAddOpen;
+  const isAnyDrawerOpen = isParentEditOpen || isParentAddOpen || isStudentAddOpen || isStudentQuickPaymentOpen;
 
   const buildParentAddInitialForm = (autoGenerateCode = false): ParentAddForm => ({
     firstName: '',
@@ -353,6 +369,13 @@ export const SchoolControlPage: React.FC = () => {
     parentCode: '',
   });
 
+  const buildStudentQuickPaymentInitialForm = (email = ''): StudentQuickPaymentForm => ({
+    userEmail: email,
+    paymentMethod: STUDENT_QUICK_PAYMENT_METHODS[0],
+    amount: '0',
+    currency: 'EGP',
+  });
+
   useEffect(() => {
     if (activeTab !== 'parents') {
       setSelectedParent(null);
@@ -365,6 +388,9 @@ export const SchoolControlPage: React.FC = () => {
       setSelectedStudent(null);
       setStudentPaymentSearch('');
       setExpandedStudentTransactionKey(null);
+      setIsStudentQuickPaymentOpen(false);
+      setIsSubmittingStudentQuickPayment(false);
+      setStudentQuickPaymentForm(buildStudentQuickPaymentInitialForm());
     }
   }, [activeTab]);
 
@@ -1342,6 +1368,42 @@ export const SchoolControlPage: React.FC = () => {
     [selectedStudentTransactions]
   );
 
+  const studentQuickPaymentAmount = useMemo(
+    () => parseAmount(studentQuickPaymentForm.amount),
+    [studentQuickPaymentForm.amount]
+  );
+
+  const handleOpenStudentQuickPayment = () => {
+    if (!selectedStudent) return;
+    setStudentQuickPaymentForm(buildStudentQuickPaymentInitialForm(selectedStudentParent?.email || ''));
+    setIsSubmittingStudentQuickPayment(false);
+    setIsStudentQuickPaymentOpen(true);
+  };
+
+  const handleCloseStudentQuickPayment = () => {
+    setIsStudentQuickPaymentOpen(false);
+    setIsSubmittingStudentQuickPayment(false);
+    setStudentQuickPaymentForm(buildStudentQuickPaymentInitialForm(selectedStudentParent?.email || ''));
+  };
+
+  const handleSubmitStudentQuickPayment = () => {
+    if (!selectedStudent) return;
+    if (studentQuickPaymentAmount <= 0) {
+      window.alert('من فضلك أدخل قيمة صحيحة للدفع');
+      return;
+    }
+
+    setIsSubmittingStudentQuickPayment(true);
+    window.alert(
+      `تم إنشاء طلب دفع فوري للطالب ${selectedStudent.name || '-'} بقيمة ${formatAmount(
+        studentQuickPaymentAmount,
+        studentQuickPaymentForm.currency || 'EGP'
+      )}`
+    );
+    setIsSubmittingStudentQuickPayment(false);
+    handleCloseStudentQuickPayment();
+  };
+
   return (
     <div className="p-4 md:p-8 space-y-6 min-h-screen relative pb-24">
       <div className="flex justify-end items-center gap-2 mb-2 text-gray-500 hover:text-brand-purple cursor-pointer w-fit ml-auto">
@@ -1987,7 +2049,7 @@ export const SchoolControlPage: React.FC = () => {
                 <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-4">
                   <button
                     type="button"
-                    onClick={() => window.alert(`طلب دفع فوري للطالب ${selectedStudent.name || ''}`)}
+                    onClick={handleOpenStudentQuickPayment}
                     className="px-5 py-2 rounded-full border border-[#9b79e8] text-brand-purple font-bold hover:bg-purple-50 transition-colors"
                   >
                     طلب دفع فوري
@@ -2009,7 +2071,7 @@ export const SchoolControlPage: React.FC = () => {
                     <p className="text-gray-400 text-5xl font-bold mb-3">لا يوجد مدفوعات</p>
                     <button
                       type="button"
-                      onClick={() => window.alert(`طلب دفع فوري للطالب ${selectedStudent.name || ''}`)}
+                      onClick={handleOpenStudentQuickPayment}
                       className="px-8 py-2 rounded-full border border-[#9b79e8] text-brand-purple font-bold hover:bg-purple-50 transition-colors"
                     >
                       طلب دفع فوري
@@ -2172,6 +2234,110 @@ export const SchoolControlPage: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {isStudentQuickPaymentOpen && selectedStudent && (
+        <div className="fixed inset-0 z-[90] bg-black/45" onClick={handleCloseStudentQuickPayment}>
+          <aside
+            className="absolute right-0 top-0 h-full w-full max-w-[680px] bg-[#f4f4f6] shadow-2xl rounded-l-[28px] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+            dir="rtl"
+          >
+            <div className="h-24 bg-gradient-to-r from-[#6f2eea] to-[#8737ff] text-white flex items-center justify-between px-8 rounded-tl-[28px]">
+              <button
+                type="button"
+                onClick={handleCloseStudentQuickPayment}
+                className="h-10 w-10 rounded-full hover:bg-white/10 transition-colors flex items-center justify-center"
+                aria-label="إغلاق"
+              >
+                <X className="w-8 h-8" />
+              </button>
+              <h3 className="text-5xl font-bold">طلب دفع فوري</h3>
+            </div>
+
+            <div className="flex-1 overflow-auto px-8 py-8 space-y-8">
+              <label className="block">
+                <span className="text-gray-600 text-xl font-semibold">المستخدم</span>
+                <input
+                  type="email"
+                  value={studentQuickPaymentForm.userEmail}
+                  onChange={(e) =>
+                    setStudentQuickPaymentForm((prev) => ({
+                      ...prev,
+                      userEmail: e.target.value,
+                    }))
+                  }
+                  className="w-full mt-3 bg-transparent border-b-2 border-gray-300 pb-3 text-4xl font-medium text-gray-700 focus:outline-none focus:border-[#7e4de0]"
+                  dir="ltr"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-gray-600 text-xl font-semibold">طريقة الدفع</span>
+                <div className="relative mt-3">
+                  <select
+                    value={studentQuickPaymentForm.paymentMethod}
+                    onChange={(e) =>
+                      setStudentQuickPaymentForm((prev) => ({
+                        ...prev,
+                        paymentMethod: e.target.value,
+                      }))
+                    }
+                    className="w-full appearance-none bg-transparent border-b-2 border-gray-300 pb-3 pl-10 text-4xl font-medium text-gray-700 focus:outline-none focus:border-[#7e4de0]"
+                  >
+                    {STUDENT_QUICK_PAYMENT_METHODS.map((method) => (
+                      <option key={method} value={method}>
+                        {method}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="w-6 h-6 text-gray-500 absolute left-0 top-2 pointer-events-none" />
+                </div>
+              </label>
+
+              <div className="block">
+                <span className="text-gray-700 text-4xl font-semibold">ادخل القيمه</span>
+                <div className="mt-3 rounded-2xl bg-[#ededf0] px-4 py-5">
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={studentQuickPaymentForm.amount}
+                    onChange={(e) =>
+                      setStudentQuickPaymentForm((prev) => ({
+                        ...prev,
+                        amount: e.target.value,
+                      }))
+                    }
+                    className="w-full bg-transparent border-b-2 border-[#7e4de0] pb-2 text-5xl font-bold text-gray-700 focus:outline-none"
+                    dir="ltr"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-5xl font-bold text-gray-700 mb-4">تفاصيل الطلب</h4>
+                <div className="rounded-2xl border border-gray-300 bg-[#f7f7fa] p-6 flex items-center justify-between">
+                  <span className="text-5xl font-bold text-gray-700">اجمالي المطلوب</span>
+                  <span className="text-5xl font-bold text-gray-700" dir="ltr">
+                    {formatAmount(studentQuickPaymentAmount, studentQuickPaymentForm.currency || 'EGP')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-8 py-8">
+              <button
+                type="button"
+                onClick={handleSubmitStudentQuickPayment}
+                disabled={isSubmittingStudentQuickPayment}
+                className="min-w-44 h-16 px-8 rounded-full bg-gradient-to-r from-[#6f2eea] to-[#8737ff] text-white text-2xl font-bold hover:opacity-90 disabled:opacity-60 transition-opacity"
+              >
+                {isSubmittingStudentQuickPayment ? 'جاري التنفيذ...' : 'ادفع الآن'}
+              </button>
+            </div>
+          </aside>
         </div>
       )}
 

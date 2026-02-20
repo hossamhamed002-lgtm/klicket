@@ -100,7 +100,7 @@ function App() {
         <button
           type="button"
           onClick={() => setIsSidebarOpen(true)}
-          className="hidden lg:flex fixed right-4 bottom-6 z-40 h-12 w-12 rounded-full bg-white border border-[#d8c9f8] text-[#a681ef] shadow-lg items-center justify-center hover:bg-[#f6f2ff] transition-colors"
+          className="hidden lg:flex fixed right-4 top-4 z-40 h-12 w-12 rounded-full bg-white border border-[#d8c9f8] text-[#a681ef] shadow-lg items-center justify-center hover:bg-[#f6f2ff] transition-colors"
           aria-label="إظهار القائمة الجانبية"
         >
           <ChevronsLeft className="w-7 h-7" />

@@ -29,8 +29,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentPage = 'tra
         isOpen ? 'translate-x-0' : 'translate-x-full'
       }`}
     >
+      {/* Collapse Trigger */}
+      <div className="px-4 pt-4 flex justify-start" dir="ltr">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="h-12 w-12 rounded-full bg-white border border-[#d8c9f8] text-[#a681ef] shadow-sm hover:bg-[#f6f2ff] transition-colors flex items-center justify-center"
+          aria-label="إخفاء القائمة الجانبية"
+        >
+          <ChevronsRight className="w-7 h-7" />
+        </button>
+      </div>
+
       {/* Logo Area */}
-      <div className="h-28 flex items-center justify-center mb-2">
+      <div className="h-28 flex items-center justify-center mt-1 mb-2">
         <h1 className="text-[62px] leading-none tracking-[-0.06em] font-semibold select-none">
           <span className="text-[#4f4f56]">kl</span>
           <span className="text-[#6b23db]">i</span>
@@ -107,18 +119,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate, currentPage = 'tra
         </div>
 
       </nav>
-
-       {/* Collapse Trigger */}
-      <div className="p-4 mt-auto mb-4 flex justify-start" dir="ltr">
-        <button
-          type="button"
-          onClick={onToggle}
-          className="h-12 w-12 rounded-full bg-white border border-[#d8c9f8] text-[#a681ef] shadow-sm hover:bg-[#f6f2ff] transition-colors flex items-center justify-center"
-          aria-label="إخفاء القائمة الجانبية"
-        >
-          <ChevronsRight className="w-7 h-7" />
-        </button>
-      </div>
     </aside>
   );
 };

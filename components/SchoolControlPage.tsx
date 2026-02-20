@@ -268,9 +268,12 @@ export const SchoolControlPage: React.FC = () => {
     grade: '',
     parentCode: '',
   });
+  const [studentParentSearch, setStudentParentSearch] = useState('');
+  const [isStudentParentDropdownOpen, setIsStudentParentDropdownOpen] = useState(false);
 
   const parentFileInputRef = useRef<HTMLInputElement>(null);
   const studentFileInputRef = useRef<HTMLInputElement>(null);
+  const studentParentDropdownRef = useRef<HTMLDivElement>(null);
   const parentsDataRef = useRef<ParentRow[]>([]);
   const studentsDataRef = useRef<StudentRow[]>([]);
   const isAnyDrawerOpen = isParentEditOpen || isParentAddOpen || isStudentAddOpen;
@@ -335,6 +338,19 @@ export const SchoolControlPage: React.FC = () => {
       document.body.style.overflow = previous;
     };
   }, [isAnyDrawerOpen]);
+
+  useEffect(() => {
+    if (!isStudentParentDropdownOpen) return;
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (studentParentDropdownRef.current && !studentParentDropdownRef.current.contains(event.target as Node)) {
+        setIsStudentParentDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isStudentParentDropdownOpen]);
 
   useEffect(() => {
     parentsDataRef.current = parentsData;
@@ -604,6 +620,8 @@ export const SchoolControlPage: React.FC = () => {
     setSelectedParent(null);
     setActiveTab('students');
     setStudentAddForm(buildStudentAddInitialForm(false));
+    setStudentParentSearch('');
+    setIsStudentParentDropdownOpen(false);
     setIsStudentAddOpen(true);
   };
 
@@ -611,6 +629,8 @@ export const SchoolControlPage: React.FC = () => {
     setIsStudentAddOpen(false);
     setIsSavingStudentAdd(false);
     setStudentAddForm(buildStudentAddInitialForm(false));
+    setStudentParentSearch('');
+    setIsStudentParentDropdownOpen(false);
   };
 
   const handleSaveStudentAdd = async () => {
@@ -933,6 +953,29 @@ export const SchoolControlPage: React.FC = () => {
 
     return Array.from(byCode.values()).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
   }, [parentsData]);
+
+  const filteredParentSelectOptions = useMemo(() => {
+    const query = normalizeKey(studentParentSearch);
+    if (!query) return parentSelectOptions;
+
+    return parentSelectOptions.filter((parent) =>
+      normalizeKey(`${parent.name} ${parent.code}`).includes(query)
+    );
+  }, [parentSelectOptions, studentParentSearch]);
+
+  useEffect(() => {
+    if (!isStudentAddOpen || !studentAddForm.parentCode) return;
+
+    const selectedParent = parentSelectOptions.find(
+      (parent) => normalizeKey(parent.code) === normalizeKey(studentAddForm.parentCode)
+    );
+    if (!selectedParent) return;
+
+    const nextLabel = `${selectedParent.name} - ${selectedParent.code}`;
+    if (studentParentSearch !== nextLabel) {
+      setStudentParentSearch(nextLabel);
+    }
+  }, [isStudentAddOpen, parentSelectOptions, studentAddForm.parentCode, studentParentSearch]);
 
   const studentGradeOptions = useMemo(() => {
     return Array.from(
@@ -1787,21 +1830,56 @@ export const SchoolControlPage: React.FC = () => {
                   </datalist>
                 </label>
 
-                <label className="block">
+                <div className="block relative" ref={studentParentDropdownRef}>
                   <span className="text-gray-500 text-lg font-semibold">* أولياء الأمور</span>
-                  <select
-                    value={studentAddForm.parentCode}
-                    onChange={(e) => setStudentAddForm((prev) => ({ ...prev, parentCode: e.target.value }))}
-                    className="w-full mt-3 bg-transparent border-b-2 border-gray-300 pb-2 text-xl font-semibold text-gray-700 focus:outline-none focus:border-[#7e4de0]"
-                  >
-                    <option value="">اختر ولي الأمر</option>
-                    {parentSelectOptions.map((parent) => (
-                      <option key={parent.code} value={parent.code}>
-                        {parent.name} - {parent.code}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                  <div className="relative mt-3">
+                    <input
+                      type="text"
+                      value={studentParentSearch}
+                      onFocus={() => setIsStudentParentDropdownOpen(true)}
+                      onChange={(e) => {
+                        setStudentParentSearch(e.target.value);
+                        setIsStudentParentDropdownOpen(true);
+                        setStudentAddForm((prev) => ({ ...prev, parentCode: '' }));
+                      }}
+                      placeholder="ابحث عن ولي الأمر بالاسم أو الكود"
+                      className="w-full bg-transparent border-b-2 border-gray-300 pb-2 pl-10 text-xl font-semibold text-gray-700 focus:outline-none focus:border-[#7e4de0]"
+                    />
+                    <ChevronDown
+                      className={`w-5 h-5 text-gray-500 absolute left-0 top-1 transition-transform ${
+                        isStudentParentDropdownOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </div>
+
+                  {isStudentParentDropdownOpen && (
+                    <div className="absolute right-0 left-0 mt-2 max-h-56 overflow-auto rounded-xl border border-gray-200 bg-white shadow-xl z-30">
+                      {filteredParentSelectOptions.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-gray-500">لا يوجد ولي أمر مطابق للبحث</div>
+                      ) : (
+                        filteredParentSelectOptions.map((parent) => {
+                          const isActive = normalizeKey(studentAddForm.parentCode) === normalizeKey(parent.code);
+                          return (
+                            <button
+                              key={parent.code}
+                              type="button"
+                              onClick={() => {
+                                setStudentAddForm((prev) => ({ ...prev, parentCode: parent.code }));
+                                setStudentParentSearch(`${parent.name} - ${parent.code}`);
+                                setIsStudentParentDropdownOpen(false);
+                              }}
+                              className={`w-full text-right px-4 py-2.5 text-sm transition-colors ${
+                                isActive ? 'bg-purple-50 text-brand-purple font-semibold' : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {parent.name} - {parent.code}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 

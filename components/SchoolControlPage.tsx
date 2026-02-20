@@ -118,6 +118,7 @@ type ActiveTab = 'parents' | 'students' | 'classes';
 const TRANSACTIONS_API_ENDPOINT = '/api/transactions';
 const SCHOOL_CONTROL_API_ENDPOINT = '/api/school-control';
 const STUDENT_QUICK_PAYMENT_METHODS = ['BTC-POS-Fawry', 'BTC-POS-Card', 'Cash'];
+const STUDENT_QUICK_PAYMENT_DEFAULT_USER = 'taleem@alfardoos.com';
 
 const normalizeText = (value: any): string =>
   String(value ?? '')
@@ -321,7 +322,7 @@ export const SchoolControlPage: React.FC = () => {
     parentCode: '',
   });
   const [studentQuickPaymentForm, setStudentQuickPaymentForm] = useState<StudentQuickPaymentForm>({
-    userEmail: '',
+    userEmail: STUDENT_QUICK_PAYMENT_DEFAULT_USER,
     paymentMethod: STUDENT_QUICK_PAYMENT_METHODS[0],
     amount: '0',
     currency: 'EGP',
@@ -369,7 +370,9 @@ export const SchoolControlPage: React.FC = () => {
     parentCode: '',
   });
 
-  const buildStudentQuickPaymentInitialForm = (email = ''): StudentQuickPaymentForm => ({
+  const buildStudentQuickPaymentInitialForm = (
+    email = STUDENT_QUICK_PAYMENT_DEFAULT_USER
+  ): StudentQuickPaymentForm => ({
     userEmail: email,
     paymentMethod: STUDENT_QUICK_PAYMENT_METHODS[0],
     amount: '0',
@@ -1375,7 +1378,7 @@ export const SchoolControlPage: React.FC = () => {
 
   const handleOpenStudentQuickPayment = () => {
     if (!selectedStudent) return;
-    setStudentQuickPaymentForm(buildStudentQuickPaymentInitialForm(selectedStudentParent?.email || ''));
+    setStudentQuickPaymentForm(buildStudentQuickPaymentInitialForm());
     setIsSubmittingStudentQuickPayment(false);
     setIsStudentQuickPaymentOpen(true);
   };
@@ -1383,7 +1386,7 @@ export const SchoolControlPage: React.FC = () => {
   const handleCloseStudentQuickPayment = () => {
     setIsStudentQuickPaymentOpen(false);
     setIsSubmittingStudentQuickPayment(false);
-    setStudentQuickPaymentForm(buildStudentQuickPaymentInitialForm(selectedStudentParent?.email || ''));
+    setStudentQuickPaymentForm(buildStudentQuickPaymentInitialForm());
   };
 
   const handleSubmitStudentQuickPayment = () => {
@@ -2240,25 +2243,25 @@ export const SchoolControlPage: React.FC = () => {
       {isStudentQuickPaymentOpen && selectedStudent && (
         <div className="fixed inset-0 z-[90] bg-black/45" onClick={handleCloseStudentQuickPayment}>
           <aside
-            className="absolute right-0 top-0 h-full w-full max-w-[680px] bg-[#f4f4f6] shadow-2xl rounded-l-[28px] flex flex-col"
+            className="absolute right-0 top-0 h-full w-full max-w-[560px] bg-[#f4f4f6] shadow-2xl rounded-l-[24px] flex flex-col"
             onClick={(e) => e.stopPropagation()}
             dir="rtl"
           >
-            <div className="h-24 bg-gradient-to-r from-[#6f2eea] to-[#8737ff] text-white flex items-center justify-between px-8 rounded-tl-[28px]">
+            <div className="h-20 bg-gradient-to-r from-[#6f2eea] to-[#8737ff] text-white flex items-center justify-between px-6 rounded-tl-[24px]">
               <button
                 type="button"
                 onClick={handleCloseStudentQuickPayment}
-                className="h-10 w-10 rounded-full hover:bg-white/10 transition-colors flex items-center justify-center"
+                className="h-9 w-9 rounded-full hover:bg-white/10 transition-colors flex items-center justify-center"
                 aria-label="إغلاق"
               >
-                <X className="w-8 h-8" />
+                <X className="w-7 h-7" />
               </button>
-              <h3 className="text-5xl font-bold">طلب دفع فوري</h3>
+              <h3 className="text-3xl font-bold">طلب دفع فوري</h3>
             </div>
 
-            <div className="flex-1 overflow-auto px-8 py-8 space-y-8">
+            <div className="flex-1 overflow-auto px-6 py-6 space-y-6">
               <label className="block">
-                <span className="text-gray-600 text-xl font-semibold">المستخدم</span>
+                <span className="text-gray-600 text-base font-semibold">المستخدم</span>
                 <input
                   type="email"
                   value={studentQuickPaymentForm.userEmail}
@@ -2268,14 +2271,14 @@ export const SchoolControlPage: React.FC = () => {
                       userEmail: e.target.value,
                     }))
                   }
-                  className="w-full mt-3 bg-transparent border-b-2 border-gray-300 pb-3 text-4xl font-medium text-gray-700 focus:outline-none focus:border-[#7e4de0]"
+                  className="w-full mt-2 bg-transparent border-b-2 border-gray-300 pb-2 text-2xl font-medium text-gray-700 focus:outline-none focus:border-[#7e4de0]"
                   dir="ltr"
                 />
               </label>
 
               <label className="block">
-                <span className="text-gray-600 text-xl font-semibold">طريقة الدفع</span>
-                <div className="relative mt-3">
+                <span className="text-gray-600 text-base font-semibold">طريقة الدفع</span>
+                <div className="relative mt-2">
                   <select
                     value={studentQuickPaymentForm.paymentMethod}
                     onChange={(e) =>
@@ -2284,7 +2287,7 @@ export const SchoolControlPage: React.FC = () => {
                         paymentMethod: e.target.value,
                       }))
                     }
-                    className="w-full appearance-none bg-transparent border-b-2 border-gray-300 pb-3 pl-10 text-4xl font-medium text-gray-700 focus:outline-none focus:border-[#7e4de0]"
+                    className="w-full appearance-none bg-transparent border-b-2 border-gray-300 pb-2 pl-8 text-2xl font-medium text-gray-700 focus:outline-none focus:border-[#7e4de0]"
                   >
                     {STUDENT_QUICK_PAYMENT_METHODS.map((method) => (
                       <option key={method} value={method}>
@@ -2292,13 +2295,13 @@ export const SchoolControlPage: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="w-6 h-6 text-gray-500 absolute left-0 top-2 pointer-events-none" />
+                  <ChevronDown className="w-5 h-5 text-gray-500 absolute left-0 top-2 pointer-events-none" />
                 </div>
               </label>
 
               <div className="block">
-                <span className="text-gray-700 text-4xl font-semibold">ادخل القيمه</span>
-                <div className="mt-3 rounded-2xl bg-[#ededf0] px-4 py-5">
+                <span className="text-gray-700 text-2xl font-semibold">ادخل القيمه</span>
+                <div className="mt-2 rounded-2xl bg-[#ededf0] px-4 py-4">
                   <input
                     type="number"
                     min="0"
@@ -2310,29 +2313,29 @@ export const SchoolControlPage: React.FC = () => {
                         amount: e.target.value,
                       }))
                     }
-                    className="w-full bg-transparent border-b-2 border-[#7e4de0] pb-2 text-5xl font-bold text-gray-700 focus:outline-none"
+                    className="w-full bg-transparent border-b-2 border-[#7e4de0] pb-2 text-3xl font-bold text-gray-700 focus:outline-none"
                     dir="ltr"
                   />
                 </div>
               </div>
 
               <div>
-                <h4 className="text-5xl font-bold text-gray-700 mb-4">تفاصيل الطلب</h4>
-                <div className="rounded-2xl border border-gray-300 bg-[#f7f7fa] p-6 flex items-center justify-between">
-                  <span className="text-5xl font-bold text-gray-700">اجمالي المطلوب</span>
-                  <span className="text-5xl font-bold text-gray-700" dir="ltr">
+                <h4 className="text-2xl font-bold text-gray-700 mb-3">تفاصيل الطلب</h4>
+                <div className="rounded-2xl border border-gray-300 bg-[#f7f7fa] p-5 flex items-center justify-between">
+                  <span className="text-3xl font-bold text-gray-700">اجمالي المطلوب</span>
+                  <span className="text-3xl font-bold text-gray-700" dir="ltr">
                     {formatAmount(studentQuickPaymentAmount, studentQuickPaymentForm.currency || 'EGP')}
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="px-8 py-8">
+            <div className="px-6 py-6">
               <button
                 type="button"
                 onClick={handleSubmitStudentQuickPayment}
                 disabled={isSubmittingStudentQuickPayment}
-                className="min-w-44 h-16 px-8 rounded-full bg-gradient-to-r from-[#6f2eea] to-[#8737ff] text-white text-2xl font-bold hover:opacity-90 disabled:opacity-60 transition-opacity"
+                className="min-w-36 h-14 px-7 rounded-full bg-gradient-to-r from-[#6f2eea] to-[#8737ff] text-white text-xl font-bold hover:opacity-90 disabled:opacity-60 transition-opacity"
               >
                 {isSubmittingStudentQuickPayment ? 'جاري التنفيذ...' : 'ادفع الآن'}
               </button>

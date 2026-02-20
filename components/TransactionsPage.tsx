@@ -57,6 +57,7 @@ interface TransactionExportColumn {
 }
 
 type DetailsTabKey = 'payment' | 'operation' | 'customer';
+type UploadMode = 'append' | 'replace';
 
 const STATUS_OPTIONS = ['ناجحة', 'منتظرة', 'غير ناجحة', 'مستردة', 'ملغية'] as const;
 type StatusOption = (typeof STATUS_OPTIONS)[number];
@@ -124,12 +125,16 @@ export const TransactionsPage: React.FC = () => {
   const [activeDetailsTab, setActiveDetailsTab] = useState<DetailsTabKey>('payment');
   const [transactionsPage, setTransactionsPage] = useState(1);
   const [transactionsPageSize, setTransactionsPageSize] = useState(5);
+  const [isUploadModeMenuOpen, setIsUploadModeMenuOpen] = useState(false);
+  const [selectedUploadMode, setSelectedUploadMode] = useState<UploadMode | null>(null);
   
   // Refs
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const transactionsDataRef = useRef<TransactionRow[]>([]);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const searchDropdownRef = useRef<HTMLDivElement>(null);
+  const uploadModeMenuRef = useRef<HTMLDivElement>(null);
 
   // --- Helper: Clean Number String ---
   const cleanNumber = (val: any): string => {
@@ -449,6 +454,10 @@ export const TransactionsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    transactionsDataRef.current = transactionsData;
+  }, [transactionsData]);
+
+  useEffect(() => {
     if (!isStatusDropdownOpen) return;
 
     const handleOutsideClick = (event: MouseEvent) => {
@@ -473,6 +482,19 @@ export const TransactionsPage: React.FC = () => {
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [isSearchDropdownOpen]);
+
+  useEffect(() => {
+    if (!isUploadModeMenuOpen) return;
+
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (uploadModeMenuRef.current && !uploadModeMenuRef.current.contains(event.target as Node)) {
+        setIsUploadModeMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isUploadModeMenuOpen]);
 
   useEffect(() => {
     if (!selectedTransaction) return;
@@ -555,7 +577,18 @@ export const TransactionsPage: React.FC = () => {
   }, [displayedTransactions, transactionsPage, transactionsPageSize]);
 
   // --- Handle File Upload ---
+  const resetUploadSelection = () => {
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    setSelectedUploadMode(null);
+  };
+
   const handleUploadClick = () => {
+    setIsUploadModeMenuOpen((open) => !open);
+  };
+
+  const handleSelectUploadMode = (mode: UploadMode) => {
+    setSelectedUploadMode(mode);
+    setIsUploadModeMenuOpen(false);
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
@@ -563,12 +596,19 @@ export const TransactionsPage: React.FC = () => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      setSelectedUploadMode(null);
+      return;
+    }
+    const uploadMode: UploadMode = selectedUploadMode ?? 'replace';
 
     const reader = new FileReader();
     reader.onload = async (evt) => {
       const dataBuffer = evt.target?.result;
-      if (!dataBuffer) return;
+      if (!dataBuffer) {
+        resetUploadSelection();
+        return;
+      }
 
       const wb = read(dataBuffer, { type: 'array' });
       const wsname = wb.SheetNames[0];
@@ -586,6 +626,7 @@ export const TransactionsPage: React.FC = () => {
 
       if (headerRowIndex === -1) {
         alert('لم يتم العثور على ترويسة صحيحة داخل ملف الإكسيل');
+        resetUploadSelection();
         return;
       }
 
@@ -633,6 +674,7 @@ export const TransactionsPage: React.FC = () => {
 
       if (receiptIndex === -1 || totalIndex === -1) {
         alert('تعذر تحديد الأعمدة الأساسية (رقم العملية / الإجمالي) داخل الملف');
+        resetUploadSelection();
         return;
       }
 
@@ -690,26 +732,38 @@ export const TransactionsPage: React.FC = () => {
       if (dedupedData.length === 0) {
         alert('الملف تم قراءته لكن لم يتم العثور على بيانات صالحة للعرض');
       } else {
-        setTransactionsData(dedupedData);
+        const currentData = transactionsDataRef.current;
+        const nextData =
+          uploadMode === 'append'
+            ? dedupeTransactions([...dedupedData, ...currentData])
+            : dedupedData;
+        const addedRows = Math.max(0, nextData.length - currentData.length);
+
+        setTransactionsData(nextData);
+        transactionsDataRef.current = nextData;
         setSelectedTransaction(null);
         setSearchQuery('');
         setFromDate('');
         setToDate('');
         setTransactionsPage(1);
-        const saveResult = await saveTransactionsToServer(dedupedData);
+        const saveResult = await saveTransactionsToServer(nextData);
         const supabaseHint =
           saveResult.error && (/SUPABASE_/i.test(saveResult.error) || /supabase/i.test(saveResult.error))
             ? '\nتأكد من إضافة SUPABASE_URL و SUPABASE_SERVICE_ROLE_KEY في إعدادات Vercel ثم أعد النشر.'
             : '';
         alert(
           saveResult.ok
-            ? `تم تحميل ${dedupedData.length} عملية وحفظها بنجاح`
-            : `تم تحميل البيانات، لكن حدث خطأ أثناء الحفظ على الخادم: ${saveResult.error}${supabaseHint}`
+            ? uploadMode === 'append'
+              ? `تم تحديث البيانات بنجاح. تمت إضافة ${addedRows} عملية جديدة، وإجمالي العمليات الآن ${nextData.length}`
+              : `تم إعادة رفع ${nextData.length} عملية وحفظها بنجاح`
+            : uploadMode === 'append'
+            ? `تم تحديث البيانات محليًا، لكن حدث خطأ أثناء الحفظ على الخادم: ${saveResult.error}${supabaseHint}`
+            : `تم إعادة الرفع محليًا، لكن حدث خطأ أثناء الحفظ على الخادم: ${saveResult.error}${supabaseHint}`
         );
       }
       
       // Reset input
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      resetUploadSelection();
     };
     reader.readAsArrayBuffer(file);
   };
@@ -846,14 +900,39 @@ export const TransactionsPage: React.FC = () => {
                 onChange={handleFileChange} 
             />
 
-            {/* Upload Button (Arrow Icon Only) */}
-            <button 
-                onClick={handleUploadClick}
-                className="flex items-center justify-center p-2.5 border border-brand-purple text-brand-purple rounded-full bg-white hover:bg-purple-50 transition-colors shadow-sm"
-                title="رفع ملف اكسيل"
-            >
-                <Upload className="w-4 h-4" />
-            </button>
+            {/* Upload Button with Mode Selection */}
+            <div className="relative" ref={uploadModeMenuRef}>
+              <button 
+                  type="button"
+                  onClick={handleUploadClick}
+                  className="flex items-center justify-center p-2.5 border border-brand-purple text-brand-purple rounded-full bg-white hover:bg-purple-50 transition-colors shadow-sm"
+                  title="رفع ملف اكسيل"
+              >
+                  <Upload className="w-4 h-4" />
+              </button>
+
+              {isUploadModeMenuOpen && (
+                <div className="absolute right-0 mt-2 z-30 w-72 bg-white border border-gray-200 rounded-xl shadow-xl p-2 space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectUploadMode('append')}
+                    className="w-full text-right px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors"
+                  >
+                    <p className="text-sm font-semibold text-gray-800">تحديث البيانات</p>
+                    <p className="text-xs text-gray-500">إضافة بيانات الملف على البيانات الحالية بدون حذفها</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelectUploadMode('replace')}
+                    className="w-full text-right px-3 py-2 rounded-lg hover:bg-red-50 transition-colors"
+                  >
+                    <p className="text-sm font-semibold text-gray-800">إعادة رفع البيانات</p>
+                    <p className="text-xs text-gray-500">مسح البيانات الحالية ورفع الملف الجديد بالكامل</p>
+                  </button>
+                </div>
+              )}
+            </div>
 
             {/* Download Button */}
             <button 

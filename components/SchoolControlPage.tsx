@@ -2271,13 +2271,9 @@ export const SchoolControlPage: React.FC = () => {
                 <input
                   type="email"
                   value={studentQuickPaymentForm.userEmail}
-                  onChange={(e) =>
-                    setStudentQuickPaymentForm((prev) => ({
-                      ...prev,
-                      userEmail: e.target.value,
-                    }))
-                  }
-                  className="w-full mt-2 bg-transparent border-b-2 border-gray-300 pb-2 text-2xl font-medium text-gray-700 focus:outline-none focus:border-[#7e4de0]"
+                  readOnly
+                  aria-readonly="true"
+                  className="w-full mt-2 bg-transparent border-b-2 border-gray-300 pb-2 text-2xl font-medium text-gray-700 focus:outline-none cursor-not-allowed"
                   dir="ltr"
                 />
               </label>

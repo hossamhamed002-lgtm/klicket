@@ -38,18 +38,32 @@ interface StudentRow {
 interface TransactionLiteRow {
   id: string;
   total: string;
+  totalNoTax: string;
   status: string;
   currency: string;
+  date: string;
+  method: string;
+  itemName: string;
+  academicYear: string;
+  provider: string;
+  bankReferenceNumber: string;
+  merchantOrderId: string;
+  fees: string;
+  discount: string;
   parentCode: string;
+  parentName: string;
   studentId: string;
   studentName: string;
   gradeName: string;
 }
 
-interface ParentChildSummary {
+interface ParentChildPaymentsGroup {
+  key: string;
   name: string;
   studentCode: string;
   grade: string;
+  externalId: string;
+  transactions: TransactionLiteRow[];
   paidAmount: number;
 }
 
@@ -110,6 +124,23 @@ const normalizeHeader = (value: any): string => normalizeText(value).replace(/[\
 
 const parseAmount = (value: any): number => {
   const parsed = parseFloat(String(value ?? '').replace(/,/g, '').replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const parseDateToTimestamp = (value: any): number => {
+  const str = String(value ?? '').trim();
+  if (!str) return 0;
+
+  const ddmmyyyy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (ddmmyyyy) {
+    const day = parseInt(ddmmyyyy[1], 10);
+    const month = parseInt(ddmmyyyy[2], 10) - 1;
+    const year = parseInt(ddmmyyyy[3], 10);
+    const parsed = new Date(year, month, day).getTime();
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  const parsed = new Date(str).getTime();
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
@@ -227,6 +258,8 @@ export const SchoolControlPage: React.FC = () => {
   const [parentSearch, setParentSearch] = useState('');
   const [studentSearch, setStudentSearch] = useState('');
   const [classSearch, setClassSearch] = useState('');
+  const [parentChildSearchByKey, setParentChildSearchByKey] = useState<Record<string, string>>({});
+  const [expandedParentTransactionKey, setExpandedParentTransactionKey] = useState<string | null>(null);
   const [parentsPage, setParentsPage] = useState(1);
   const [parentsPageSize, setParentsPageSize] = useState(5);
   const [studentsPage, setStudentsPage] = useState(1);
@@ -331,6 +364,11 @@ export const SchoolControlPage: React.FC = () => {
   }, [classSearch]);
 
   useEffect(() => {
+    setParentChildSearchByKey({});
+    setExpandedParentTransactionKey(null);
+  }, [selectedParent?.code, selectedParent?.code2]);
+
+  useEffect(() => {
     if (!isAnyDrawerOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -375,9 +413,20 @@ export const SchoolControlPage: React.FC = () => {
           .map((row: any) => ({
             id: String(row?.id ?? '').trim(),
             total: String(row?.total ?? '').trim(),
+            totalNoTax: String(row?.totalNoTax ?? '').trim(),
             status: String(row?.status ?? '').trim(),
             currency: String(row?.currency ?? 'EGP').trim(),
+            date: String(row?.date ?? '').trim(),
+            method: String(row?.method ?? '').trim(),
+            itemName: String(row?.itemName ?? '').trim(),
+            academicYear: String(row?.academicYear ?? '').trim(),
+            provider: String(row?.provider ?? '').trim(),
+            bankReferenceNumber: String(row?.bankReferenceNumber ?? '').trim(),
+            merchantOrderId: String(row?.merchantOrderId ?? '').trim(),
+            fees: String(row?.fees ?? '').trim(),
+            discount: String(row?.discount ?? '').trim(),
             parentCode: String(row?.parentCode ?? '').trim(),
+            parentName: String(row?.parentName ?? '').trim(),
             studentId: String(row?.studentId ?? '').trim(),
             studentName: String(row?.studentName ?? '').trim(),
             gradeName: String(row?.gradeName ?? '').trim(),
@@ -1069,12 +1118,12 @@ export const SchoolControlPage: React.FC = () => {
     return transactionsData.filter((row) => selectedParentCodes.includes(normalizeKey(row.parentCode)));
   }, [selectedParent, selectedParentCodes, transactionsData]);
 
-  const parentChildrenSummary = useMemo(() => {
+  const parentChildrenPayments = useMemo(() => {
     if (!selectedParent || selectedParentCodes.length === 0) return [];
 
-    const byStudent = new Map<string, ParentChildSummary>();
+    const byStudent = new Map<string, ParentChildPaymentsGroup>();
 
-    const ensureStudent = (seed: { name?: string; studentCode?: string; grade?: string }) => {
+    const ensureStudent = (seed: { name?: string; studentCode?: string; grade?: string; externalId?: string }) => {
       const key = normalizeKey(seed.studentCode || seed.name || '');
       if (!key) return null;
 
@@ -1083,13 +1132,17 @@ export const SchoolControlPage: React.FC = () => {
         existing.name = existing.name || seed.name || '';
         existing.studentCode = existing.studentCode || seed.studentCode || '';
         existing.grade = existing.grade || seed.grade || '';
+        existing.externalId = existing.externalId || seed.externalId || '';
         return existing;
       }
 
-      const created: ParentChildSummary = {
+      const created: ParentChildPaymentsGroup = {
+        key,
         name: seed.name || '-',
         studentCode: seed.studentCode || '-',
         grade: seed.grade || '-',
+        externalId: seed.externalId || '-',
+        transactions: [],
         paidAmount: 0,
       };
       byStudent.set(key, created);
@@ -1099,7 +1152,12 @@ export const SchoolControlPage: React.FC = () => {
     studentsData
       .filter((row) => selectedParentCodes.includes(normalizeKey(row.parentCode)))
       .forEach((row) => {
-        ensureStudent({ name: row.name, studentCode: row.studentCode, grade: row.grade });
+        ensureStudent({
+          name: row.name,
+          studentCode: row.studentCode,
+          grade: row.grade,
+          externalId: row.externalId,
+        });
       });
 
     parentTransactions.forEach((tx) => {
@@ -1109,7 +1167,10 @@ export const SchoolControlPage: React.FC = () => {
         grade: tx.gradeName,
       });
 
-      if (student && isSuccessfulStatus(tx.status)) {
+      if (!student) return;
+
+      student.transactions.push(tx);
+      if (isSuccessfulStatus(tx.status)) {
         student.paidAmount += parseAmount(tx.total);
       }
     });
@@ -1117,17 +1178,24 @@ export const SchoolControlPage: React.FC = () => {
     return Array.from(byStudent.values()).sort((a, b) => {
       if (b.paidAmount !== a.paidAmount) return b.paidAmount - a.paidAmount;
       return a.name.localeCompare(b.name, 'ar');
-    });
+    }).map((child) => ({
+      ...child,
+      transactions: [...child.transactions].sort((a, b) => {
+        const dateDiff = parseDateToTimestamp(b.date) - parseDateToTimestamp(a.date);
+        if (dateDiff !== 0) return dateDiff;
+        return String(b.id).localeCompare(String(a.id), 'en');
+      }),
+    }));
   }, [selectedParent, selectedParentCodes, studentsData, parentTransactions]);
 
   const parentTotalPaid = useMemo(
-    () => parentChildrenSummary.reduce((sum, child) => sum + child.paidAmount, 0),
-    [parentChildrenSummary]
+    () => parentChildrenPayments.reduce((sum, child) => sum + child.paidAmount, 0),
+    [parentChildrenPayments]
   );
 
-  const paidStudentsCount = useMemo(
-    () => parentChildrenSummary.filter((child) => child.paidAmount > 0).length,
-    [parentChildrenSummary]
+  const parentTransactionsCount = useMemo(
+    () => parentChildrenPayments.reduce((sum, child) => sum + child.transactions.length, 0),
+    [parentChildrenPayments]
   );
 
   return (
@@ -1382,90 +1450,191 @@ export const SchoolControlPage: React.FC = () => {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-            <div className="bg-white rounded-xl border border-gray-100 p-5 xl:col-span-2">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-md border border-gray-200">
-                  <ChevronDown className="w-4 h-4 text-gray-400" />
-                  <span className="text-sm font-bold text-gray-700">EGP</span>
-                  <span className="text-sm text-gray-500">: العملة</span>
-                </div>
-                <h4 className="text-2xl font-bold text-gray-700">مدفوعات الوالد</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-xl border border-gray-100 p-5 md:col-span-2">
+              <div className="text-gray-500 text-lg mb-1">إجمالي المدفوع</div>
+              <div className="text-4xl font-bold text-brand-purple" dir="ltr">
+                {formatAmount(parentTotalPaid)}
               </div>
-
-              <div className="text-center py-4">
-                <div className="text-gray-500 text-lg mb-1">المدفوع</div>
-                <div className="text-4xl font-bold text-brand-purple" dir="ltr">
-                  {formatAmount(parentTotalPaid)}
-                </div>
-                <div className="text-gray-500 mt-2">عدد الأبناء الذين لديهم مدفوعات: {paidStudentsCount}</div>
-              </div>
-
-              <div className="w-full h-3 bg-gray-200 rounded-full mt-5" />
             </div>
-
             <div className="bg-white rounded-xl border border-gray-100 p-5">
-              <h4 className="text-xl font-bold text-gray-700 mb-4">بيانات ولي الأمر</h4>
-              <div className="space-y-3 text-gray-700">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-gray-500">اسم ولي الأمر</span>
-                  <span className="font-semibold">{selectedParent.name || '-'}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-gray-500">رقم تعريف ولي الأمر</span>
-                  <span className="font-semibold font-mono">{selectedParent.code || '-'}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-gray-500">رقم تعريف إضافي</span>
-                  <span className="font-semibold font-mono">{selectedParent.code2 || '-'}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-gray-500">البريد الإلكتروني</span>
-                  <span className="font-semibold" dir="ltr">{selectedParent.email || '-'}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-gray-500">رقم الهاتف</span>
-                  <span className="font-semibold font-mono">{selectedParent.phone || '-'}</span>
-                </div>
-              </div>
+              <div className="text-gray-500 text-lg mb-1">إجمالي العمليات</div>
+              <div className="text-4xl font-bold text-brand-purple">{parentTransactionsCount}</div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
-              <h4 className="text-2xl font-bold text-gray-700">الأبناء المرتبطون بولي الأمر</h4>
-              <div className="text-brand-purple font-bold text-xl">المدفوع {paidStudentsCount}</div>
+          {parentChildrenPayments.length === 0 ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-10 text-center text-gray-400 text-2xl font-semibold">
+              لا يوجد أبناء مرتبطون بهذا الرقم
             </div>
+          ) : (
+            <div className="space-y-6">
+              {parentChildrenPayments.map((child) => {
+                const studentInitial = (child.name || '-').trim().charAt(0) || '-';
+                const childSearch = parentChildSearchByKey[child.key] || '';
+                const normalizedChildSearch = normalizeKey(childSearch);
+                const childTransactions = normalizedChildSearch
+                  ? child.transactions.filter((tx) =>
+                      normalizeKey(
+                        `${tx.itemName} ${tx.id} ${tx.merchantOrderId} ${tx.studentName} ${tx.date} ${tx.method}`
+                      ).includes(normalizedChildSearch)
+                    )
+                  : child.transactions;
 
-            {parentChildrenSummary.length === 0 ? (
-              <div className="p-10 text-center text-gray-400 text-2xl font-semibold">لا يوجد أبناء مرتبطون بهذا الرقم</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[850px] border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100 text-gray-600 text-sm font-bold">
-                      <th className="py-4 px-4 text-right">اسم الطالب</th>
-                      <th className="py-4 px-4 text-right">كود الطالب</th>
-                      <th className="py-4 px-4 text-right">الصف الدراسي</th>
-                      <th className="py-4 px-4 text-right">المدفوعات</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-gray-700">
-                    {parentChildrenSummary.map((child, index) => (
-                      <tr key={`${child.studentCode}-${index}`} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                        <td className="py-4 px-4 font-semibold">{child.name || '-'}</td>
-                        <td className="py-4 px-4 font-mono text-gray-500">{child.studentCode || '-'}</td>
-                        <td className="py-4 px-4 text-gray-600">{child.grade || '-'}</td>
-                        <td className="py-4 px-4 font-bold" dir="ltr">
-                          {child.paidAmount > 0 ? formatAmount(child.paidAmount) : 'EGP 0.00'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                return (
+                  <div key={child.key} className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+                    <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                      <h4 className="text-3xl font-bold text-gray-700">{child.name || 'طالب'}</h4>
+                      <div className="text-brand-purple text-2xl font-bold flex items-center gap-2">
+                        <span>{childTransactions.length}</span>
+                        <span>المدفوع</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 p-4 bg-[#fafafb]">
+                      <div className="xl:col-span-8 bg-white border border-gray-100 rounded-xl">
+                        <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-4">
+                          <button
+                            type="button"
+                            className="px-5 py-2 rounded-full border border-[#9b79e8] text-brand-purple font-bold hover:bg-purple-50 transition-colors"
+                          >
+                            طلب دفع فوري
+                          </button>
+                          <div className="relative w-full max-w-md">
+                            <input
+                              type="text"
+                              value={childSearch}
+                              onChange={(e) =>
+                                setParentChildSearchByKey((prev) => ({ ...prev, [child.key]: e.target.value }))
+                              }
+                              placeholder="بحث خلال الاسم او رقم العملية"
+                              className="w-full rounded-full border border-gray-200 bg-gray-50 py-2 pr-4 pl-10 text-sm text-gray-700 outline-none focus:border-brand-purple"
+                            />
+                            <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          </div>
+                        </div>
+
+                        {childTransactions.length === 0 ? (
+                          <div className="p-8 text-center text-gray-400">لا توجد عمليات مطابقة</div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[840px] border-collapse">
+                              <thead>
+                                <tr className="text-gray-700 text-sm font-bold border-b border-gray-100">
+                                  <th className="py-3 px-4 text-right">Payment Name</th>
+                                  <th className="py-3 px-4 text-right">Transaction Number</th>
+                                  <th className="py-3 px-4 text-right">Order Date</th>
+                                  <th className="py-3 px-4 text-right">Payment Method</th>
+                                  <th className="py-3 px-4 text-right">Amount</th>
+                                  <th className="py-3 px-4 text-right">Academic Year</th>
+                                </tr>
+                              </thead>
+                              <tbody className="text-gray-600 text-sm">
+                                {childTransactions.map((tx, index) => {
+                                  const rowKey = `${child.key}-${tx.id}-${index}`;
+                                  const isExpanded = expandedParentTransactionKey === rowKey;
+                                  return (
+                                    <React.Fragment key={rowKey}>
+                                      <tr
+                                        className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer"
+                                        onClick={() =>
+                                          setExpandedParentTransactionKey((current) =>
+                                            current === rowKey ? null : rowKey
+                                          )
+                                        }
+                                      >
+                                        <td className="py-3 px-4">{tx.itemName || 'Tuition Fees'}</td>
+                                        <td className="py-3 px-4 font-mono">{tx.id || '-'}</td>
+                                        <td className="py-3 px-4 font-mono">{tx.date || '-'}</td>
+                                        <td className="py-3 px-4">{tx.method || '-'}</td>
+                                        <td className="py-3 px-4 font-semibold" dir="ltr">
+                                          {formatAmount(parseAmount(tx.total), tx.currency || 'EGP')}
+                                        </td>
+                                        <td className="py-3 px-4">{tx.academicYear || child.grade || '-'}</td>
+                                      </tr>
+                                      {isExpanded && (
+                                        <tr className="bg-[#f8f5ff] border-b border-gray-100">
+                                          <td colSpan={6} className="px-4 py-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                                              <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                                <div className="text-gray-500 mb-1">Merchant Order ID</div>
+                                                <div className="font-semibold">{tx.merchantOrderId || '-'}</div>
+                                              </div>
+                                              <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                                <div className="text-gray-500 mb-1">Bank Reference</div>
+                                                <div className="font-semibold">{tx.bankReferenceNumber || '-'}</div>
+                                              </div>
+                                              <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                                <div className="text-gray-500 mb-1">Provider</div>
+                                                <div className="font-semibold">{tx.provider || '-'}</div>
+                                              </div>
+                                              <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                                <div className="text-gray-500 mb-1">Status</div>
+                                                <div className="font-semibold">{tx.status || '-'}</div>
+                                              </div>
+                                              <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                                <div className="text-gray-500 mb-1">Subtotal</div>
+                                                <div className="font-semibold" dir="ltr">
+                                                  {formatAmount(parseAmount(tx.totalNoTax), tx.currency || 'EGP')}
+                                                </div>
+                                              </div>
+                                              <div className="bg-white border border-gray-200 rounded-lg px-3 py-2">
+                                                <div className="text-gray-500 mb-1">Fees / Discount</div>
+                                                <div className="font-semibold" dir="ltr">
+                                                  {formatAmount(parseAmount(tx.fees), tx.currency || 'EGP')} /{' '}
+                                                  {formatAmount(parseAmount(tx.discount), tx.currency || 'EGP')}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      )}
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="xl:col-span-4 bg-white border border-gray-100 rounded-xl overflow-hidden">
+                        <div className="p-6 flex flex-col items-center text-center border-b border-gray-100">
+                          <div className="h-16 w-16 rounded-lg bg-purple-100 text-brand-purple text-4xl font-bold flex items-center justify-center mb-4">
+                            {studentInitial}
+                          </div>
+                          <h5 className="text-3xl font-bold text-gray-700 leading-tight">{child.name || '-'}</h5>
+                          <div className="mt-3 text-brand-purple text-2xl font-semibold font-mono">
+                            {child.studentCode || '-'}
+                          </div>
+                        </div>
+                        <div className="p-4 text-gray-600 text-sm space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span>الصفوف الدراسية</span>
+                            <span className="font-semibold">{child.grade || '-'}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>رقم التعريف الخارجي</span>
+                            <span className="font-semibold">{child.externalId || '-'}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>عدد العمليات</span>
+                            <span className="font-semibold">{child.transactions.length}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>إجمالي المدفوع</span>
+                            <span className="font-semibold" dir="ltr">
+                              {formatAmount(child.paidAmount)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

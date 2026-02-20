@@ -1376,11 +1376,16 @@ export const SchoolControlPage: React.FC = () => {
     [studentQuickPaymentForm.amount]
   );
 
-  const handleOpenStudentQuickPayment = () => {
-    if (!selectedStudent) return;
+  const openStudentQuickPaymentDrawer = (targetStudent: StudentRow) => {
+    setSelectedStudent(targetStudent);
     setStudentQuickPaymentForm(buildStudentQuickPaymentInitialForm());
     setIsSubmittingStudentQuickPayment(false);
     setIsStudentQuickPaymentOpen(true);
+  };
+
+  const handleOpenStudentQuickPayment = () => {
+    if (!selectedStudent) return;
+    openStudentQuickPaymentDrawer(selectedStudent);
   };
 
   const handleCloseStudentQuickPayment = () => {
@@ -1724,6 +1729,7 @@ export const SchoolControlPage: React.FC = () => {
                         <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-4">
                           <button
                             type="button"
+                            onClick={() => openStudentQuickPaymentDrawer(studentToEdit)}
                             className="px-5 py-2 rounded-full border border-[#9b79e8] text-brand-purple font-bold hover:bg-purple-50 transition-colors"
                           >
                             طلب دفع فوري

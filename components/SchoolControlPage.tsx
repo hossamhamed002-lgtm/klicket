@@ -234,6 +234,9 @@ const dedupeStudents = (rows: StudentRow[]): StudentRow[] => {
   return Array.from(map.values());
 };
 
+const getStudentRowKey = (row: StudentRow): string =>
+  normalizeKey(row.studentCode || `${row.name}-${row.parentCode}`);
+
 const buildUniqueCode = (prefix: string, usedValues: string[]): string => {
   const used = new Set(usedValues.map((value) => normalizeKey(value)).filter(Boolean));
   let attempts = 0;
@@ -269,6 +272,7 @@ export const SchoolControlPage: React.FC = () => {
   const [isParentEditOpen, setIsParentEditOpen] = useState(false);
   const [isParentAddOpen, setIsParentAddOpen] = useState(false);
   const [isStudentAddOpen, setIsStudentAddOpen] = useState(false);
+  const [studentEditKey, setStudentEditKey] = useState<string | null>(null);
   const [parentEditKey, setParentEditKey] = useState('');
   const [isSavingParentEdit, setIsSavingParentEdit] = useState(false);
   const [isSavingParentAdd, setIsSavingParentAdd] = useState(false);
@@ -668,8 +672,33 @@ export const SchoolControlPage: React.FC = () => {
   const openStudentAddDrawer = () => {
     setSelectedParent(null);
     setActiveTab('students');
+    setStudentEditKey(null);
     setStudentAddForm(buildStudentAddInitialForm(false));
     setStudentParentSearch('');
+    setIsStudentParentDropdownOpen(false);
+    setIsStudentAddOpen(true);
+  };
+
+  const openStudentEditDrawer = (student: StudentRow) => {
+    const parentCode = student.parentCode || '';
+    const selectedParentOption = parentSelectOptions.find(
+      (parent) => normalizeKey(parent.code) === normalizeKey(parentCode)
+    );
+
+    setStudentEditKey(getStudentRowKey(student));
+    setStudentAddForm({
+      name: student.name || '',
+      externalId: student.externalId || '',
+      birthDate: student.birthDate || '',
+      studentCode: student.studentCode || '',
+      autoGenerateCode: false,
+      classification: student.classification || '',
+      grade: student.grade || '',
+      parentCode,
+    });
+    setStudentParentSearch(
+      selectedParentOption ? `${selectedParentOption.name} - ${selectedParentOption.code}` : parentCode
+    );
     setIsStudentParentDropdownOpen(false);
     setIsStudentAddOpen(true);
   };
@@ -677,6 +706,7 @@ export const SchoolControlPage: React.FC = () => {
   const handleCloseStudentAdd = () => {
     setIsStudentAddOpen(false);
     setIsSavingStudentAdd(false);
+    setStudentEditKey(null);
     setStudentAddForm(buildStudentAddInitialForm(false));
     setStudentParentSearch('');
     setIsStudentParentDropdownOpen(false);
@@ -716,12 +746,27 @@ export const SchoolControlPage: React.FC = () => {
       return;
     }
 
-    const duplicateStudentCode = studentsDataRef.current.some(
-      (row) => normalizeKey(row.studentCode) === normalizeKey(resolvedStudentCode)
-    );
-    if (duplicateStudentCode) {
-      alert('كود الطالب موجود بالفعل');
-      return;
+    const isEditingStudent = Boolean(studentEditKey);
+    const normalizedResolvedCode = normalizeKey(resolvedStudentCode);
+
+    if (isEditingStudent) {
+      const hasDuplicateWithAnotherStudent = studentsDataRef.current.some((row) => {
+        const rowKey = getStudentRowKey(row);
+        return rowKey !== studentEditKey && normalizeKey(row.studentCode) === normalizedResolvedCode;
+      });
+
+      if (hasDuplicateWithAnotherStudent) {
+        alert('كود الطالب موجود بالفعل');
+        return;
+      }
+    } else {
+      const duplicateStudentCode = studentsDataRef.current.some(
+        (row) => normalizeKey(row.studentCode) === normalizedResolvedCode
+      );
+      if (duplicateStudentCode) {
+        alert('كود الطالب موجود بالفعل');
+        return;
+      }
     }
 
     const linkedParent = parentsDataRef.current.find((row) => {
@@ -742,14 +787,27 @@ export const SchoolControlPage: React.FC = () => {
       classification: studentAddForm.classification.trim(),
     };
 
-    const nextStudents = dedupeStudents([nextStudent, ...studentsDataRef.current]);
+    const nextStudents = isEditingStudent
+      ? dedupeStudents(
+          studentsDataRef.current.some((row) => getStudentRowKey(row) === studentEditKey)
+            ? studentsDataRef.current.map((row) =>
+                getStudentRowKey(row) === studentEditKey ? nextStudent : row
+              )
+            : [nextStudent, ...studentsDataRef.current]
+        )
+      : dedupeStudents([nextStudent, ...studentsDataRef.current]);
+
     setIsSavingStudentAdd(true);
     setStudentsData(nextStudents);
     studentsDataRef.current = nextStudents;
 
     const saveResult = await saveSchoolControlToServer(parentsDataRef.current, nextStudents);
     if (!saveResult.ok) {
-      alert(`تم إضافة الطالب محليًا، لكن فشل الحفظ على الخادم: ${saveResult.error}`);
+      alert(
+        isEditingStudent
+          ? `تم تعديل الطالب محليًا، لكن فشل الحفظ على الخادم: ${saveResult.error}`
+          : `تم إضافة الطالب محليًا، لكن فشل الحفظ على الخادم: ${saveResult.error}`
+      );
       setIsSavingStudentAdd(false);
       return;
     }
@@ -1473,6 +1531,25 @@ export const SchoolControlPage: React.FC = () => {
                 const studentInitial = (child.name || '-').trim().charAt(0) || '-';
                 const childSearch = parentChildSearchByKey[child.key] || '';
                 const normalizedChildSearch = normalizeKey(childSearch);
+                const linkedStudent =
+                  studentsData.find(
+                    (row) =>
+                      normalizeKey(row.studentCode) === normalizeKey(child.studentCode) ||
+                      (normalizeKey(row.name) === normalizeKey(child.name) &&
+                        selectedParentCodes.includes(normalizeKey(row.parentCode)))
+                  ) || null;
+                const fallbackParentCode = selectedParent?.code || selectedParent?.code2 || '';
+                const studentToEdit: StudentRow =
+                  linkedStudent || {
+                    name: child.name,
+                    studentCode: child.studentCode,
+                    grade: child.grade,
+                    parentCode: fallbackParentCode,
+                    parentName: selectedParent?.name || '',
+                    externalId: child.externalId,
+                    birthDate: '',
+                    classification: '',
+                  };
                 const childTransactions = normalizedChildSearch
                   ? child.transactions.filter((tx) =>
                       normalizeKey(
@@ -1609,6 +1686,16 @@ export const SchoolControlPage: React.FC = () => {
                           </div>
                         </div>
                         <div className="p-4 text-gray-600 text-sm space-y-2">
+                          <div className="flex justify-end mb-1">
+                            <button
+                              type="button"
+                              onClick={() => openStudentEditDrawer(studentToEdit)}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-brand-purple border border-[#d8c9f8] hover:bg-purple-50 transition-colors"
+                            >
+                              <Edit className="w-4 h-4" />
+                              <span className="font-semibold">تعديل الطالب</span>
+                            </button>
+                          </div>
                           <div className="flex items-center justify-between">
                             <span>الصفوف الدراسية</span>
                             <span className="font-semibold">{child.grade || '-'}</span>
@@ -1907,7 +1994,7 @@ export const SchoolControlPage: React.FC = () => {
               >
                 <X className="w-7 h-7" />
               </button>
-              <h3 className="text-3xl font-bold">اضافه طالب</h3>
+              <h3 className="text-3xl font-bold">{studentEditKey ? 'تعديل بيانات الطالب' : 'اضافه طالب'}</h3>
             </div>
 
             <div className="flex-1 overflow-auto px-8 py-8 space-y-7">
@@ -1942,26 +2029,28 @@ export const SchoolControlPage: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
-                <label className="flex items-center justify-start gap-3 pb-2">
-                  <input
-                    type="checkbox"
-                    checked={studentAddForm.autoGenerateCode}
-                    onChange={(e) =>
-                      setStudentAddForm((prev) => ({
-                        ...prev,
-                        autoGenerateCode: e.target.checked,
-                        studentCode: e.target.checked
-                          ? buildUniqueCode(
-                              'S',
-                              studentsDataRef.current.map((row) => row.studentCode)
-                            )
-                          : prev.studentCode,
-                      }))
-                    }
-                    className="h-7 w-7 rounded border-gray-300 accent-[#7e4de0]"
-                  />
-                  <span className="text-gray-600 text-3xl font-semibold">انشاء الكود تلقائي</span>
-                </label>
+                {!studentEditKey && (
+                  <label className="flex items-center justify-start gap-3 pb-2">
+                    <input
+                      type="checkbox"
+                      checked={studentAddForm.autoGenerateCode}
+                      onChange={(e) =>
+                        setStudentAddForm((prev) => ({
+                          ...prev,
+                          autoGenerateCode: e.target.checked,
+                          studentCode: e.target.checked
+                            ? buildUniqueCode(
+                                'S',
+                                studentsDataRef.current.map((row) => row.studentCode)
+                              )
+                            : prev.studentCode,
+                        }))
+                      }
+                      className="h-7 w-7 rounded border-gray-300 accent-[#7e4de0]"
+                    />
+                    <span className="text-gray-600 text-3xl font-semibold">انشاء الكود تلقائي</span>
+                  </label>
+                )}
 
                 <label className="block">
                   <span className="text-gray-500 text-lg font-semibold">* رمز تعريف الطالب</span>
@@ -2059,7 +2148,7 @@ export const SchoolControlPage: React.FC = () => {
                 disabled={isSavingStudentAdd}
                 className="min-w-44 h-16 px-8 rounded-full bg-gradient-to-r from-[#6f2eea] to-[#8737ff] text-white text-2xl font-bold hover:opacity-90 disabled:opacity-60 transition-opacity"
               >
-                {isSavingStudentAdd ? 'جاري الحفظ...' : 'حفظ'}
+                {isSavingStudentAdd ? 'جاري الحفظ...' : studentEditKey ? 'تحديث' : 'حفظ'}
               </button>
             </div>
           </aside>
